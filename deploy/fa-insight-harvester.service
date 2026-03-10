@@ -4,10 +4,9 @@ After=network.target postgresql.service
 
 [Service]
 Type=simple
-User=%i
-WorkingDirectory=/home/%i/fa-insight-harvester
-EnvironmentFile=/home/%i/fa-insight-harvester/.env
-ExecStart=/home/%i/.local/bin/uv run fastapi run app/main.py --host 127.0.0.1 --port 8000
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__APP_DIR__/.env
+ExecStart=%h/.local/bin/uv run fastapi run app/main.py --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5
 

@@ -36,6 +36,69 @@
     → 生成 text/image embedding
 ```
 
+## 資料模型
+
+```mermaid
+erDiagram
+    FAUser ||--o{ FAReport : uploads
+    FAWeeklyPeriod ||--o{ FAReport : contains
+    FAReport ||--o{ FACase : extracts
+
+    FAUser {
+        int id PK
+        string employee_name UK
+        string org_id
+    }
+
+    FAWeeklyPeriod {
+        int id PK
+        int year
+        int week_number
+        date start_date
+        date end_date
+    }
+
+    FAReport {
+        int id PK
+        int weekly_period_id FK
+        int uploader_id FK
+        string filename
+        int total_slides
+        string status "processing | review | done | error"
+    }
+
+    FACase {
+        int id PK
+        int report_id FK
+        int slide_number
+        string slide_image_path "→ uploads/images/report_id/slide-XX.png"
+        string customer
+        string device
+        string model
+        string defect_mode
+        string defect_rate_raw
+        string[] defect_lots "ARRAY(Text)"
+        string fab_assembly
+        string fa_status
+        string follow_up
+        vector text_embedding "pgvector dim=1024"
+        vector image_embedding "pgvector dim=1024"
+    }
+```
+
+### 圖片儲存
+
+投影片圖片存放在檔案系統，資料庫只存相對路徑：
+
+```
+uploads/images/{report_id}/
+  ├── slide-01.png      ← FACase.slide_image_path = "images/{report_id}/slide-01.png"
+  ├── slide-02.png
+  └── extraction_results.json   ← 暫存 VLM 提取結果供審核
+```
+
+FastAPI 透過 `StaticFiles(directory=uploads_dir)` mount 在 `/uploads` 路徑，前端以 `/uploads/images/{report_id}/slide-XX.png` 存取圖片。
+
 ## 技術棧
 
 | 層 | 技術 |
@@ -57,15 +120,17 @@
 fa-insight-harvester/
 ├── app/
 │   ├── main.py                    # FastAPI 入口
-│   ├── config.py                  # 環境設定
-│   ├── auth.py                    # OAuth 2.0 認證
+│   ├── core/
+│   │   ├── config.py              # 環境設定 (pydantic-settings)
+│   │   ├── auth.py                # OAuth 2.0 認證 / JWT 驗簽
+│   │   └── logging_config.py      # Loguru 日誌設定
 │   ├── models/
 │   │   ├── database.py            # AsyncSession
 │   │   └── fa_case.py             # SQLAlchemy models
 │   ├── schemas/
 │   │   └── fa_case.py             # Pydantic schemas
 │   ├── routers/
-│   │   ├── auth.py                # 登入/登出
+│   │   ├── auth.py                # 登入頁 / OAuth 回呼
 │   │   ├── upload.py              # 上傳 + SSE 進度
 │   │   ├── cases.py               # 案例 CRUD + 搜尋
 │   │   └── pages.py               # 頁面渲染
@@ -73,11 +138,12 @@ fa-insight-harvester/
 │   │   ├── pptx_parser.py         # PPTX 解析 + 預篩選
 │   │   ├── vlm_extractor.py       # VLM 提取
 │   │   ├── data_cleaner.py        # 欄位清洗
-│   │   └── embedding.py           # Embedding 生成
+│   │   ├── embedding.py           # Embedding 生成
+│   │   └── image_utils.py         # 圖片 base64 工具
 │   └── templates/                 # Jinja2 HTML 模板
 ├── alembic/                       # DB migration
 ├── deploy/
-│   ├── INSTALL.md                 # 部署指南
+│   ├── setup.sh                   # 一鍵部署腳本
 │   ├── fa-insight-harvester.service
 │   └── nginx.conf
 ├── .env.example
@@ -104,4 +170,4 @@ DEV_SKIP_AUTH=true uv run fastapi run app/main.py
 uv run uvicorn app.main:app --reload
 ```
 
-完整部署步驟請參考 [deploy/INSTALL.md](deploy/INSTALL.md)。
+完整部署請執行 `bash deploy/setup.sh`（自動建立 Docker PostgreSQL、安裝依賴、設定 systemd + nginx）。

@@ -3,31 +3,31 @@
 
 {% block content %}
 <!-- Header -->
-<div class="mb-8">
-    <h1 class="text-2xl font-semibold text-gray-900 tracking-tight">案例搜尋</h1>
-    <p class="text-sm text-gray-400 mt-1">搜尋與篩選所有失效分析案例</p>
+<div class="mb-10">
+    <h1 class="text-[26px] font-bold text-gray-900 tracking-tight">案例搜尋</h1>
+    <p class="text-[13px] text-gray-400 mt-1 font-medium">搜尋與篩選所有失效分析案例</p>
 </div>
 
 <!-- Search & Filters -->
-<div class="card bg-surface-card rounded-2xl border border-surface-muted p-5 mb-6">
+<div class="card bg-surface-card rounded-2xl p-5 mb-8">
     <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
         <div class="md:col-span-5 relative">
-            <span class="material-icons-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 text-lg">search</span>
+            <span class="material-icons-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 text-[18px]">search</span>
             <input type="text" id="searchQuery" placeholder="全文搜尋 (客戶、Device、缺陷模式...)"
-                class="w-full border border-surface-muted rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all bg-surface">
+                class="w-full input-field rounded-xl pl-10 pr-4 py-2.5 text-[13px]">
         </div>
         <div class="md:col-span-3">
             <input type="text" id="filterCustomer" placeholder="客戶篩選"
-                class="w-full border border-surface-muted rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all bg-surface">
+                class="w-full input-field rounded-xl px-4 py-2.5 text-[13px]">
         </div>
         <div class="md:col-span-2">
             <input type="text" id="filterDevice" placeholder="Device"
-                class="w-full border border-surface-muted rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all bg-surface">
+                class="w-full input-field rounded-xl px-4 py-2.5 text-[13px]">
         </div>
         <div class="md:col-span-2">
             <button onclick="searchCases()"
-                class="w-full bg-accent text-white py-2.5 rounded-xl text-sm font-medium hover:bg-accent/90 transition-colors inline-flex items-center justify-center gap-2">
-                <span class="material-icons-outlined text-base">search</span>
+                class="w-full bg-gradient-to-r from-accent to-accent-light text-white py-2.5 rounded-xl text-[13px] font-semibold hover:shadow-lg hover:shadow-accent/15 transition-all duration-300 inline-flex items-center justify-center gap-2">
+                <span class="material-icons-outlined text-[16px]">search</span>
                 搜尋
             </button>
         </div>
@@ -36,25 +36,25 @@
 
 <!-- Results -->
 <div id="resultsContainer">
-    <div class="flex flex-col items-center py-16">
-        <div class="w-14 h-14 rounded-full bg-surface-muted flex items-center justify-center mb-4">
-            <span class="material-icons-outlined text-gray-300 text-2xl">manage_search</span>
+    <div class="flex flex-col items-center py-20">
+        <div class="w-16 h-16 rounded-2xl bg-surface-muted/60 flex items-center justify-center mb-4">
+            <span class="material-icons-outlined text-gray-300 text-[28px]">manage_search</span>
         </div>
-        <p class="text-sm text-gray-400">輸入搜尋條件或直接點擊搜尋查看所有案例</p>
+        <p class="text-[13px] text-gray-400 font-medium">輸入搜尋條件或直接點擊搜尋查看所有案例</p>
     </div>
 </div>
 
 <!-- Pagination -->
-<div id="pagination" class="hidden flex items-center justify-between mt-4 px-1">
-    <p id="paginationInfo" class="text-xs text-gray-400"></p>
+<div id="pagination" class="hidden flex items-center justify-between mt-5 px-1">
+    <p id="paginationInfo" class="text-[11px] text-gray-400 font-mono font-medium"></p>
     <div class="flex gap-2">
         <button id="prevBtn" onclick="changePage(-1)"
-            class="inline-flex items-center gap-1 px-3 py-1.5 border border-surface-muted rounded-lg text-xs text-gray-500 hover:bg-surface transition-colors disabled:opacity-40" disabled>
-            <span class="material-icons-outlined text-sm">chevron_left</span>上一頁
+            class="inline-flex items-center gap-1 px-3.5 py-1.5 border border-surface-muted rounded-lg text-[12px] text-gray-500 font-medium hover:bg-surface hover:border-accent/20 transition-all duration-200 disabled:opacity-30" disabled>
+            <span class="material-icons-outlined text-[14px]">chevron_left</span>上一頁
         </button>
         <button id="nextBtn" onclick="changePage(1)"
-            class="inline-flex items-center gap-1 px-3 py-1.5 border border-surface-muted rounded-lg text-xs text-gray-500 hover:bg-surface transition-colors">
-            下一頁<span class="material-icons-outlined text-sm">chevron_right</span>
+            class="inline-flex items-center gap-1 px-3.5 py-1.5 border border-surface-muted rounded-lg text-[12px] text-gray-500 font-medium hover:bg-surface hover:border-accent/20 transition-all duration-200">
+            下一頁<span class="material-icons-outlined text-[14px]">chevron_right</span>
         </button>
     </div>
 </div>
@@ -85,7 +85,7 @@
             renderResults(data);
         } catch (err) {
             document.getElementById('resultsContainer').innerHTML =
-                `<div class="text-center py-12"><p class="text-sm text-red-500">搜尋失敗: ${err.message}</p></div>`;
+                `<div class="text-center py-16"><p class="text-[13px] text-red-500 font-medium">搜尋失敗: ${err.message}</p></div>`;
         }
     }
 
@@ -94,43 +94,43 @@
 
         if (data.items.length === 0) {
             container.innerHTML = `
-                <div class="flex flex-col items-center py-16">
-                    <div class="w-14 h-14 rounded-full bg-surface-muted flex items-center justify-center mb-4">
-                        <span class="material-icons-outlined text-gray-300 text-2xl">search_off</span>
+                <div class="flex flex-col items-center py-20">
+                    <div class="w-16 h-16 rounded-2xl bg-surface-muted/60 flex items-center justify-center mb-4">
+                        <span class="material-icons-outlined text-gray-300 text-[28px]">search_off</span>
                     </div>
-                    <p class="text-sm text-gray-400">未找到符合條件的案例</p>
+                    <p class="text-[13px] text-gray-400 font-medium">未找到符合條件的案例</p>
                 </div>`;
             document.getElementById('pagination').classList.add('hidden');
             return;
         }
 
         let html = '<div class="space-y-2">';
-        data.items.forEach(c => {
-            const statusColors = {
+        data.items.forEach((c, i) => {
+            const statusMap = {
                 'Open': 'bg-amber-50 text-amber-600 border-amber-100',
                 'Closed': 'bg-emerald-50 text-emerald-600 border-emerald-100',
             };
-            const statusClass = statusColors[c.fa_status] || 'bg-gray-50 text-gray-500 border-gray-100';
+            const statusClass = statusMap[c.fa_status] || 'bg-gray-50 text-gray-500 border-gray-100';
 
             html += `
-            <a href="/cases/${c.id}" class="card bg-surface-card rounded-xl border border-surface-muted p-4 flex items-center justify-between group block hover:border-accent/20">
-                <div class="flex items-center gap-5 min-w-0">
-                    <div class="w-9 h-9 rounded-lg bg-accent/8 flex items-center justify-center shrink-0">
-                        <span class="material-icons-outlined text-accent/60 text-base">bug_report</span>
+            <a href="/cases/${c.id}" class="stagger-in card bg-surface-card rounded-xl p-4 flex items-center justify-between group block" style="animation-delay: ${i * 0.03}s">
+                <div class="flex items-center gap-4 min-w-0">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent/[0.06] to-accent/[0.02] flex items-center justify-center shrink-0">
+                        <span class="material-icons-outlined text-accent/50 text-[18px]">bug_report</span>
                     </div>
                     <div class="min-w-0">
-                        <div class="text-sm font-medium text-gray-900 group-hover:text-accent transition-colors truncate">
-                            ${c.customer || '-'} / ${c.device || '-'}
+                        <div class="text-[13px] font-semibold text-gray-900 group-hover:text-accent transition-colors duration-200 truncate">
+                            ${c.customer || '—'} / ${c.device || '—'}
                         </div>
-                        <div class="text-xs text-gray-400 mt-0.5 truncate">
-                            ${c.defect_mode || '-'} · ${c.model || '-'} · ${c.date || '-'}
+                        <div class="text-[11px] text-gray-400 mt-0.5 truncate font-medium">
+                            ${c.defect_mode || '—'} · ${c.model || '—'} · <span class="font-mono">${c.date || '—'}</span>
                         </div>
                     </div>
                 </div>
                 <div class="flex items-center gap-4 shrink-0 ml-4">
-                    <span class="text-xs text-gray-400">${c.defect_rate_raw || ''}</span>
-                    <span class="text-[11px] px-2.5 py-0.5 rounded-full border ${statusClass} font-medium">${c.fa_status || '-'}</span>
-                    <span class="material-icons-outlined text-gray-200 group-hover:text-accent transition-colors text-lg">chevron_right</span>
+                    <span class="text-[11px] text-gray-400 font-mono font-medium">${c.defect_rate_raw || ''}</span>
+                    <span class="badge border ${statusClass}">${c.fa_status || '—'}</span>
+                    <span class="material-icons-outlined text-gray-200 group-hover:text-accent group-hover:translate-x-0.5 transition-all duration-200 text-[18px]">chevron_right</span>
                 </div>
             </a>`;
         });
@@ -141,7 +141,7 @@
         const totalPages = Math.ceil(data.total / pageSize);
         document.getElementById('pagination').classList.remove('hidden');
         document.getElementById('paginationInfo').textContent =
-            `共 ${data.total} 筆，第 ${data.page}/${totalPages} 頁`;
+            `${data.total} 筆 · ${data.page}/${totalPages}`;
         document.getElementById('prevBtn').disabled = data.page <= 1;
         document.getElementById('nextBtn').disabled = data.page >= totalPages;
     }

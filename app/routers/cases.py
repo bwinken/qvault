@@ -1,21 +1,20 @@
 """Case CRUD, review confirmation, and search routes."""
 
 import json
-import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from loguru import logger
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.auth import get_current_user_payload, get_or_create_user
-from app.config import settings
+from app.core.auth import get_current_user_payload, get_or_create_user
+from app.core.config import settings
 from app.models.database import get_db
 from app.models.fa_case import FACase, FAReport, FAWeeklyPeriod
 from app.schemas.fa_case import CaseEditRequest
-from app.services.embedding import generate_embeddings_for_case
+from app.services.embedding import build_case_text, generate_embeddings_for_case, generate_text_embedding
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["cases"])
 
 
@@ -67,17 +66,18 @@ async def confirm_and_save(
     await db.commit()
 
     # Generate embeddings in background (don't block the response)
+    vlm_client = request.app.state.vlm_client
     for case in created_cases:
         await db.refresh(case)
         try:
-            text_emb, image_emb = await generate_embeddings_for_case(case)
+            text_emb, image_emb = await generate_embeddings_for_case(vlm_client, case)
             if text_emb:
                 case.text_embedding = text_emb
             if image_emb:
                 case.image_embedding = image_emb
             await db.commit()
         except Exception as e:
-            logger.warning(f"Embedding generation failed for case {case.id}: {e}")
+            logger.warning("Embedding generation failed for case {}: {}", case.id, e)
 
     return {"status": "saved", "case_count": len(created_cases)}
 
@@ -222,13 +222,12 @@ async def update_case(
 
     # Re-generate text embedding after update
     try:
-        from app.services.embedding import generate_text_embedding, build_case_text
         text = build_case_text(case)
         if text:
-            case.text_embedding = await generate_text_embedding(text)
+            case.text_embedding = await generate_text_embedding(request.app.state.vlm_client, text)
             await db.commit()
     except Exception as e:
-        logger.warning(f"Failed to update embedding for case {case_id}: {e}")
+        logger.warning("Failed to update embedding for case {}: {}", case_id, e)
 
     return {"status": "updated"}
 

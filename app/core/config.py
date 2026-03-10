@@ -15,6 +15,14 @@ class Settings(BaseSettings):
     vlm_max_concurrency: int = 5
     vlm_retry_count: int = 2
 
+    # Qwen3.5 sampling — Instruct mode for general tasks
+    vlm_temperature: float = 0.7
+    vlm_top_p: float = 0.8
+    vlm_top_k: int = 20
+    vlm_min_p: float = 0.0
+    vlm_presence_penalty: float = 1.5
+    vlm_repetition_penalty: float = 1.0
+
     # Upload
     upload_dir: str = "./uploads"
     max_upload_size_mb: int = 100
@@ -29,7 +37,6 @@ class Settings(BaseSettings):
 
     # App
     app_base_url: str = "http://localhost:8000"
-    secret_key: str = "change-me-to-a-random-string"
     dev_skip_auth: bool = False
 
     model_config = {"env_file": ".env"}

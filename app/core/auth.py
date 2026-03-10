@@ -8,7 +8,7 @@ from fastapi import Cookie, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
+from app.core.config import settings
 from app.models.fa_case import FAUser
 
 _public_key: str | None = None

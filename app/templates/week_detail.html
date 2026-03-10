@@ -3,75 +3,77 @@
 
 {% block content %}
 <!-- Breadcrumb & Header -->
-<a href="/" class="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-accent transition-colors mb-2">
-    <span class="material-icons-outlined text-sm">arrow_back</span>返回首頁
+<a href="/" class="inline-flex items-center gap-1 text-[12px] text-gray-400 hover:text-accent transition-colors duration-200 mb-3 font-medium group">
+    <span class="material-icons-outlined text-[14px] group-hover:-translate-x-0.5 transition-transform">arrow_back</span>返回首頁
 </a>
 
-<div class="flex items-center justify-between mt-1 mb-8">
+<div class="flex items-center justify-between mt-1 mb-10">
     <div class="flex items-center gap-4">
-        <div class="w-14 h-14 rounded-xl bg-accent/8 flex flex-col items-center justify-center border border-accent/10">
-            <span class="text-[10px] font-semibold text-accent/70 uppercase leading-none">Week</span>
-            <span class="text-xl font-bold text-accent leading-tight">{{ period.week_number }}</span>
+        <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-accent/[0.06] to-accent/[0.02] flex flex-col items-center justify-center border border-accent/[0.08]">
+            <span class="text-[9px] font-bold text-accent/50 uppercase leading-none tracking-wider font-mono">Week</span>
+            <span class="data-value text-xl text-accent leading-tight">{{ period.week_number }}</span>
         </div>
         <div>
-            <h1 class="text-2xl font-semibold text-gray-900 tracking-tight">
+            <h1 class="text-[26px] font-bold text-gray-900 tracking-tight">
                 {{ period.year }}-W{{ "%02d"|format(period.week_number) }}
             </h1>
-            <p class="text-sm text-gray-400 mt-0.5">{{ period.start_date }} ~ {{ period.end_date }}</p>
+            <p class="text-[13px] text-gray-400 mt-0.5 font-mono font-medium">{{ period.start_date }} → {{ period.end_date }}</p>
         </div>
     </div>
     <a href="/upload"
-        class="inline-flex items-center gap-2 bg-accent text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-accent/90 transition-colors shadow-sm">
-        <span class="material-icons-outlined text-lg">add</span>
+        class="group inline-flex items-center gap-2 bg-gradient-to-r from-accent to-accent-light text-white px-5 py-2.5 rounded-xl text-[13px] font-semibold hover:shadow-lg hover:shadow-accent/20 transition-all duration-300 hover:-translate-y-0.5">
+        <span class="material-icons-outlined text-[18px] group-hover:rotate-90 transition-transform duration-300">add</span>
         上傳周報
     </a>
 </div>
 
 <!-- Reports -->
-<div class="mb-8">
-    <div class="flex items-center gap-2 mb-4">
-        <span class="material-icons-outlined text-gray-400 text-lg">description</span>
-        <h2 class="text-sm font-semibold text-gray-700">本周報告</h2>
+<div class="mb-10">
+    <div class="flex items-center gap-2.5 mb-4">
+        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500/10 to-blue-500/[0.04] flex items-center justify-center">
+            <span class="material-icons-outlined text-blue-500 text-[15px]">description</span>
+        </div>
+        <h2 class="text-[14px] font-semibold text-gray-700">本周報告</h2>
     </div>
 
     {% if reports %}
     <div class="space-y-2">
         {% for r in reports %}
-        <div class="card bg-surface-card rounded-xl border border-surface-muted p-4 flex items-center justify-between">
+        <div class="stagger-in card bg-surface-card rounded-xl p-4 flex items-center justify-between">
             <div class="flex items-center gap-4">
-                <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
-                    <span class="material-icons-outlined text-blue-400 text-base">description</span>
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/[0.06] to-blue-500/[0.02] flex items-center justify-center">
+                    <span class="material-icons-outlined text-blue-400 text-[18px]">description</span>
                 </div>
                 <div>
-                    <div class="text-sm font-medium text-gray-800">{{ r.report.filename }}</div>
-                    <div class="text-xs text-gray-400 mt-0.5">
-                        {{ r.uploader_name }} · {{ r.report.total_slides }} 頁 · {{ r.report.created_at.strftime('%Y-%m-%d %H:%M') }}
+                    <div class="text-[13px] font-semibold text-gray-800">{{ r.report.filename }}</div>
+                    <div class="text-[11px] text-gray-400 mt-0.5 font-medium">
+                        {{ r.uploader_name }} · <span class="font-mono">{{ r.report.total_slides }}</span> 頁 · <span class="font-mono">{{ r.report.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
                     </div>
                 </div>
             </div>
             <div class="flex items-center gap-3">
                 {% if r.report.status == 'done' %}
-                <span class="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 font-medium">
+                <span class="badge bg-emerald-50 text-emerald-600 border border-emerald-100 inline-flex items-center gap-1.5">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>完成
                 </span>
                 {% elif r.report.status == 'review' %}
-                <span class="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100 font-medium">
-                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>待審核
+                <span class="badge bg-amber-50 text-amber-600 border border-amber-100 inline-flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400 glow-dot" style="color: #f59e0b;"></span>待審核
                 </span>
                 {% elif r.report.status == 'processing' %}
-                <span class="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 font-medium">
+                <span class="badge bg-blue-50 text-blue-600 border border-blue-100 inline-flex items-center gap-1.5">
                     <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>處理中
                 </span>
                 {% else %}
-                <span class="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100 font-medium">
+                <span class="badge bg-red-50 text-red-600 border border-red-100 inline-flex items-center gap-1.5">
                     <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>錯誤
                 </span>
                 {% endif %}
 
                 {% if r.report.status == 'review' %}
                 <a href="/reports/{{ r.report.id }}/review"
-                    class="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-light transition-colors font-medium">
-                    審核<span class="material-icons-outlined text-sm">arrow_forward</span>
+                    class="inline-flex items-center gap-1 text-[12px] text-accent hover:text-accent-light transition-colors duration-200 font-semibold group">
+                    審核<span class="material-icons-outlined text-[14px] group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
                 </a>
                 {% endif %}
             </div>
@@ -79,21 +81,23 @@
         {% endfor %}
     </div>
     {% else %}
-    <div class="card bg-surface-card rounded-xl border border-surface-muted p-8 text-center">
-        <p class="text-sm text-gray-400">本周尚無報告</p>
+    <div class="card bg-surface-card rounded-xl p-10 text-center">
+        <p class="text-[13px] text-gray-400 font-medium">本周尚無報告</p>
     </div>
     {% endif %}
 </div>
 
 <!-- Cases -->
 <div>
-    <div class="flex items-center gap-2 mb-4">
-        <span class="material-icons-outlined text-gray-400 text-lg">bug_report</span>
-        <h2 class="text-sm font-semibold text-gray-700">本周案例</h2>
+    <div class="flex items-center gap-2.5 mb-4">
+        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-teal/10 to-teal/[0.04] flex items-center justify-center">
+            <span class="material-icons-outlined text-teal text-[15px]">bug_report</span>
+        </div>
+        <h2 class="text-[14px] font-semibold text-gray-700">本周案例</h2>
     </div>
     <div id="weekCases">
-        <div class="card bg-surface-card rounded-xl border border-surface-muted p-8 text-center">
-            <p class="text-sm text-gray-400 animate-pulse">載入中...</p>
+        <div class="card bg-surface-card rounded-xl p-10 text-center">
+            <p class="text-[13px] text-gray-400 font-medium animate-pulse">載入中...</p>
         </div>
     </div>
 </div>
@@ -109,32 +113,32 @@
 
             if (data.items.length === 0) {
                 container.innerHTML = `
-                    <div class="card bg-surface-card rounded-xl border border-surface-muted p-8 text-center">
-                        <p class="text-sm text-gray-400">本周尚無案例</p>
+                    <div class="card bg-surface-card rounded-xl p-10 text-center">
+                        <p class="text-[13px] text-gray-400 font-medium">本周尚無案例</p>
                     </div>`;
                 return;
             }
 
             let html = '<div class="space-y-2">';
-            data.items.forEach(c => {
+            data.items.forEach((c, i) => {
                 html += `
-                <a href="/cases/${c.id}" class="card bg-surface-card rounded-xl border border-surface-muted p-4 flex items-center justify-between group block hover:border-accent/20">
+                <a href="/cases/${c.id}" class="stagger-in card bg-surface-card rounded-xl p-4 flex items-center justify-between group block" style="animation-delay: ${i * 0.03}s">
                     <div class="flex items-center gap-4 min-w-0">
-                        <div class="w-9 h-9 rounded-lg bg-accent/8 flex items-center justify-center shrink-0">
-                            <span class="material-icons-outlined text-accent/60 text-base">bug_report</span>
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent/[0.06] to-accent/[0.02] flex items-center justify-center shrink-0">
+                            <span class="material-icons-outlined text-accent/50 text-[18px]">bug_report</span>
                         </div>
                         <div class="min-w-0">
-                            <div class="text-sm font-medium text-gray-800 group-hover:text-accent transition-colors truncate">
-                                ${c.customer || '-'} / ${c.device || '-'}
+                            <div class="text-[13px] font-semibold text-gray-800 group-hover:text-accent transition-colors duration-200 truncate">
+                                ${c.customer || '—'} / ${c.device || '—'}
                             </div>
-                            <div class="text-xs text-gray-400 mt-0.5 truncate">
-                                ${c.defect_mode || '-'} · ${c.date || '-'}
+                            <div class="text-[11px] text-gray-400 mt-0.5 truncate font-medium">
+                                ${c.defect_mode || '—'} · <span class="font-mono">${c.date || '—'}</span>
                             </div>
                         </div>
                     </div>
                     <div class="flex items-center gap-3 shrink-0 ml-4">
-                        <span class="text-xs text-gray-400 max-w-[200px] truncate">${c.fa_status || '-'}</span>
-                        <span class="material-icons-outlined text-gray-200 group-hover:text-accent transition-colors text-lg">chevron_right</span>
+                        <span class="text-[11px] text-gray-400 max-w-[200px] truncate font-medium">${c.fa_status || '—'}</span>
+                        <span class="material-icons-outlined text-gray-200 group-hover:text-accent group-hover:translate-x-0.5 transition-all duration-200 text-[18px]">chevron_right</span>
                     </div>
                 </a>`;
             });
@@ -142,8 +146,8 @@
             container.innerHTML = html;
         } catch (err) {
             container.innerHTML = `
-                <div class="card bg-surface-card rounded-xl border border-red-100 p-8 text-center">
-                    <p class="text-sm text-red-400">載入失敗: ${err.message}</p>
+                <div class="card bg-surface-card border-red-100 rounded-xl p-10 text-center">
+                    <p class="text-[13px] text-red-400 font-medium">載入失敗: ${err.message}</p>
                 </div>`;
         }
     }

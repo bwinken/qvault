@@ -1,21 +1,41 @@
-"""Embedding generation using vLLM's OpenAI-compatible embedding API."""
+"""Embedding generation using Qwen3-VL-Embedding via vLLM Chat Embeddings API.
 
-import base64
-import logging
+Reference: https://github.com/vllm-project/vllm/blob/main/examples/pooling/embed/vision_embedding_online.py
+"""
+
+import asyncio
 from pathlib import Path
 
+from loguru import logger
 from openai import AsyncOpenAI
+from openai.types.create_embedding_response import CreateEmbeddingResponse
 
-from app.config import settings
+from app.core.config import settings
 from app.models.fa_case import FACase
+from app.services.image_utils import image_to_base64
 
-logger = logging.getLogger(__name__)
+DEFAULT_INSTRUCTION = "Represent the user's input."
 
 
-def _get_client() -> AsyncOpenAI:
-    return AsyncOpenAI(
-        base_url=settings.vlm_base_url,
-        api_key=settings.vlm_api_key,
+async def _chat_embeddings(
+    client: AsyncOpenAI,
+    messages: list[dict],
+) -> CreateEmbeddingResponse:
+    """Call vLLM's Chat Embeddings API (extension of OpenAI Embeddings API).
+
+    Qwen3-VL-Embedding requires messages format with
+    continue_final_message=True and add_special_tokens=True.
+    """
+    return await client.post(
+        "/embeddings",
+        cast_to=CreateEmbeddingResponse,
+        body={
+            "messages": messages,
+            "model": settings.vlm_embedding_model,
+            "encoding_format": "float",
+            "continue_final_message": True,
+            "add_special_tokens": True,
+        },
     )
 
 
@@ -41,52 +61,51 @@ def build_case_text(case: FACase) -> str:
     return " | ".join(parts)
 
 
-async def generate_text_embedding(text: str) -> list[float]:
-    """Generate text embedding using vLLM embedding endpoint."""
-    client = _get_client()
-    response = await client.embeddings.create(
-        model=settings.vlm_embedding_model,
-        input=text,
-    )
+async def generate_text_embedding(client: AsyncOpenAI, text: str) -> list[float]:
+    """Generate text embedding using Qwen3-VL Chat Embeddings API."""
+    response = await _chat_embeddings(client, messages=[
+        {"role": "system", "content": [{"type": "text", "text": DEFAULT_INSTRUCTION}]},
+        {"role": "user", "content": [{"type": "text", "text": text}]},
+        {"role": "assistant", "content": [{"type": "text", "text": ""}]},
+    ])
     return response.data[0].embedding
 
 
-async def generate_image_embedding(image_path: str | Path) -> list[float]:
-    """Generate image embedding using vLLM embedding endpoint.
-
-    Note: This depends on the vLLM model supporting image embeddings.
-    If not supported, this will gracefully return an empty list.
-    """
+async def generate_image_embedding(client: AsyncOpenAI, image_path: str | Path) -> list[float]:
+    """Generate image embedding using Qwen3-VL Chat Embeddings API."""
     try:
-        image_path = Path(image_path)
-        if not image_path.exists():
-            logger.warning(f"Image not found for embedding: {image_path}")
-            return []
+        b64 = image_to_base64(Path(image_path))
 
-        with open(image_path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode("utf-8")
-
-        client = _get_client()
-        response = await client.embeddings.create(
-            model=settings.vlm_embedding_model,
-            input=f"data:image/png;base64,{b64}",
-        )
+        response = await _chat_embeddings(client, messages=[
+            {"role": "system", "content": [{"type": "text", "text": DEFAULT_INSTRUCTION}]},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                    {"type": "text", "text": ""},
+                ],
+            },
+            {"role": "assistant", "content": [{"type": "text", "text": ""}]},
+        ])
         return response.data[0].embedding
     except Exception as e:
-        logger.warning(f"Image embedding failed (may not be supported): {e}")
+        logger.warning("Image embedding failed: {}", e)
         return []
 
 
-async def generate_embeddings_for_case(case: FACase) -> tuple[list[float], list[float]]:
+async def generate_embeddings_for_case(
+    client: AsyncOpenAI, case: FACase
+) -> tuple[list[float], list[float]]:
     """Generate both text and image embeddings for a case.
 
     Returns (text_embedding, image_embedding).
     """
     text = build_case_text(case)
-    text_emb = await generate_text_embedding(text) if text else []
-    image_emb = (
-        await generate_image_embedding(case.slide_image_path)
+    text_coro = generate_text_embedding(client, text) if text else asyncio.sleep(0, result=[])
+    image_coro = (
+        generate_image_embedding(client, case.slide_image_path)
         if case.slide_image_path
-        else []
+        else asyncio.sleep(0, result=[])
     )
+    text_emb, image_emb = await asyncio.gather(text_coro, image_coro)
     return text_emb, image_emb

@@ -2,17 +2,17 @@
 
 import asyncio
 import json
-import logging
 import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
-from app.auth import get_current_user_payload, get_or_create_user
-from app.config import settings
+from app.core.auth import get_current_user_payload, get_or_create_user
+from app.core.config import settings
 from app.models.database import get_db
 from app.models.fa_case import FAReport, FAWeeklyPeriod
 from app.services.data_cleaner import clean_extracted_data
@@ -22,8 +22,6 @@ from app.services.pptx_parser import (
     pre_filter_slides,
 )
 from app.services.vlm_extractor import extract_slides_batch
-
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["upload"])
 
 # In-memory store for processing progress (report_id → progress events)
@@ -37,6 +35,7 @@ async def upload_report(
     week_number: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    overwrite: bool = False,
 ):
     """Upload a PPTX weekly report and start processing."""
     payload = get_current_user_payload(request)
@@ -64,6 +63,34 @@ async def upload_report(
         db.add(period)
         await db.flush()
 
+    # Check for duplicate filename in this weekly period
+    dup_result = await db.execute(
+        select(FAReport).where(
+            FAReport.weekly_period_id == period.id,
+            FAReport.filename == file.filename,
+        )
+    )
+    existing_report = dup_result.scalar_one_or_none()
+
+    if existing_report and not overwrite:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": f"檔案 '{file.filename}' 已存在於 {year}-W{week_number:02d}",
+                "existing_report_id": existing_report.id,
+                "existing_status": existing_report.status,
+                "existing_created_at": existing_report.created_at.isoformat(),
+            },
+        )
+
+    if existing_report and overwrite:
+        old_dir = settings.images_path / str(existing_report.id)
+        if old_dir.exists():
+            shutil.rmtree(old_dir)
+        await db.delete(existing_report)
+        await db.flush()
+        logger.info("Overwriting report {} ({})", existing_report.id, file.filename)
+
     # Create report record
     report = FAReport(
         weekly_period_id=period.id,
@@ -88,7 +115,7 @@ async def upload_report(
     _progress_store[report.id] = queue
 
     # Start background processing
-    asyncio.create_task(_process_report(report.id, pptx_path, report_dir, queue))
+    asyncio.create_task(_process_report(request.app, report.id, pptx_path, report_dir, queue))
 
     return {"report_id": report.id, "status": "processing"}
 
@@ -144,16 +171,15 @@ async def get_processing_results(
 
 
 async def _process_report(
+    app,
     report_id: int,
     pptx_path: Path,
     output_dir: Path,
     queue: asyncio.Queue,
 ):
     """Background task: parse PPTX → pre-filter → VLM extract → save results."""
-    from app.models.database import async_session
-
     try:
-        async with async_session() as db:
+        async with app.state.db_session() as db:
             # Step 1: Extract text for pre-filtering
             await queue.put({"type": "status", "data": {"message": "正在解析投影片文字..."}})
             slide_texts = extract_slide_texts(pptx_path)
@@ -200,7 +226,7 @@ async def _process_report(
 
             if candidate_images:
                 vlm_results = await extract_slides_batch(
-                    candidate_images, candidate_numbers, on_progress=on_vlm_progress
+                    app.state.vlm_client, candidate_images, candidate_numbers, on_progress=on_vlm_progress
                 )
             else:
                 vlm_results = []
@@ -290,14 +316,14 @@ async def _process_report(
             })
 
     except Exception as e:
-        logger.exception(f"Processing failed for report {report_id}")
+        logger.exception("Processing failed for report {}", report_id)
         await queue.put({
             "type": "error",
             "data": {"message": f"處理失敗: {str(e)}"},
         })
         # Update report status
         try:
-            async with async_session() as db:
+            async with app.state.db_session() as db:
                 result = await db.execute(
                     select(FAReport).where(FAReport.id == report_id)
                 )

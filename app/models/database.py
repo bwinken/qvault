@@ -1,11 +1,6 @@
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
-from app.config import settings
-
-engine = create_async_engine(settings.database_url, echo=False)
-async_session = async_sessionmaker(engine, expire_on_commit=False)
+from fastapi import Request
 
 
-async def get_db():
-    async with async_session() as session:
+async def get_db(request: Request):
+    async with request.app.state.db_session() as session:
         yield session

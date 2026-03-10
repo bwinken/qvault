@@ -1,15 +1,13 @@
 """PPTX parsing: extract text for pre-filtering + convert slides to PNG images."""
 
 import asyncio
-import logging
 import subprocess
 from pathlib import Path
 
+from loguru import logger
 from pptx import Presentation
 
-from app.config import settings
-
-logger = logging.getLogger(__name__)
+from app.core.config import settings
 
 # Keywords that indicate a case page
 CASE_KEYWORDS = [
@@ -63,30 +61,6 @@ async def convert_pptx_to_images(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # LibreOffice converts PPTX → PDF first, then we use it to get PNGs
-    # Actually, LibreOffice can export directly to images via filter
-    cmd = [
-        "libreoffice",
-        "--headless",
-        "--convert-to", "png",
-        "--outdir", str(output_dir),
-        str(pptx_path),
-    ]
-
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    stdout, stderr = await process.communicate()
-
-    if process.returncode != 0:
-        logger.error(f"LibreOffice conversion failed: {stderr.decode()}")
-        raise RuntimeError(f"LibreOffice conversion failed: {stderr.decode()}")
-
-    # LibreOffice only outputs a single image for multi-slide PPTX
-    # We need to use PDF as intermediate: PPTX → PDF → per-page PNG
-    # Let's use the PDF approach instead
     pdf_path = output_dir / pptx_path.with_suffix(".pdf").name
 
     # Step 1: PPTX → PDF
@@ -127,14 +101,11 @@ async def convert_pptx_to_images(
 
     # Clean up intermediate PDF
     pdf_path.unlink(missing_ok=True)
-    # Also clean up the single PNG from the first conversion attempt
-    single_png = output_dir / pptx_path.with_suffix(".png").name
-    single_png.unlink(missing_ok=True)
 
     # Collect output images sorted by name
     images = sorted(output_dir.glob("slide-*.png"))
     if not images:
         raise RuntimeError("No slide images generated")
 
-    logger.info(f"Converted {len(images)} slides to PNG")
+    logger.info("Converted {} slides to PNG", len(images))
     return images

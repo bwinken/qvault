@@ -3,67 +3,68 @@
 
 {% block content %}
 <!-- Header -->
-<div class="mb-8">
-    <h1 class="text-2xl font-semibold text-gray-900 tracking-tight">上傳周報</h1>
-    <p class="text-sm text-gray-400 mt-1">上傳 .pptx 格式的失效分析周報，系統將自動提取案例</p>
+<div class="mb-10">
+    <h1 class="text-[26px] font-bold text-gray-900 tracking-tight">上傳周報</h1>
+    <p class="text-[13px] text-gray-400 mt-1 font-medium">上傳 .pptx 格式的失效分析周報，系統將自動提取案例</p>
 </div>
 
 <div class="max-w-2xl">
-    <form id="uploadForm" class="card bg-surface-card rounded-2xl border border-surface-muted p-8 space-y-6">
+    <form id="uploadForm" class="card bg-surface-card rounded-2xl p-8 space-y-7">
         <!-- Week selection -->
         <div>
-            <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 block">周次選擇</label>
+            <label class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 block">周次選擇</label>
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-600 mb-1.5">年度</label>
+                    <label class="block text-[13px] font-medium text-gray-600 mb-1.5">年度</label>
                     <input type="number" id="year" name="year"
-                        class="w-full border border-surface-muted rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all bg-surface">
+                        class="w-full input-field rounded-xl px-4 py-2.5 text-[13px] font-mono">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-600 mb-1.5">第幾周</label>
+                    <label class="block text-[13px] font-medium text-gray-600 mb-1.5">第幾周</label>
                     <input type="number" id="week_number" name="week_number" min="1" max="53"
-                        class="w-full border border-surface-muted rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all bg-surface">
+                        class="w-full input-field rounded-xl px-4 py-2.5 text-[13px] font-mono">
                 </div>
             </div>
         </div>
 
         <!-- File upload -->
         <div>
-            <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 block">檔案上傳</label>
+            <label class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 block">檔案上傳</label>
             <div id="dropZone"
-                class="border-2 border-dashed border-surface-muted rounded-2xl p-10 text-center hover:border-accent/40 hover:bg-accent/[0.03] transition-all cursor-pointer group">
-                <div class="flex flex-col items-center">
-                    <div class="w-14 h-14 rounded-full bg-accent/8 flex items-center justify-center mb-4 group-hover:bg-accent/15 transition-colors">
-                        <span class="material-icons-outlined text-accent text-2xl">upload_file</span>
+                class="border-2 border-dashed border-surface-deep rounded-2xl p-12 text-center hover:border-accent/40 hover:bg-accent/[0.02] transition-all duration-300 cursor-pointer group relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-accent/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="flex flex-col items-center relative">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent/8 to-accent/[0.02] flex items-center justify-center mb-4 group-hover:from-accent/15 group-hover:scale-105 transition-all duration-300 border border-accent/[0.06]">
+                        <span class="material-icons-outlined text-accent/70 text-[28px]">upload_file</span>
                     </div>
-                    <p class="text-sm text-gray-500" id="dropText">拖放 .pptx 檔案到這裡</p>
-                    <p class="text-xs text-gray-300 mt-1">或點擊選擇檔案</p>
+                    <p class="text-[13px] text-gray-500 font-medium" id="dropText">拖放 .pptx 檔案到這裡</p>
+                    <p class="text-[11px] text-gray-300 mt-1.5 font-medium">或點擊選擇檔案</p>
                 </div>
                 <input type="file" id="fileInput" name="file" accept=".pptx" class="hidden">
             </div>
         </div>
 
         <button type="submit" id="submitBtn"
-            class="w-full bg-accent text-white py-3 rounded-xl font-medium text-sm hover:bg-accent/90 transition-colors shadow-sm disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:shadow-none"
+            class="w-full bg-gradient-to-r from-accent to-accent-light text-white py-3 rounded-xl font-semibold text-[13px] hover:shadow-lg hover:shadow-accent/20 transition-all duration-300 disabled:from-gray-200 disabled:to-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:shadow-none"
             disabled>
             上傳並開始處理
         </button>
     </form>
 
     <!-- Progress section -->
-    <div id="progressSection" class="hidden mt-6 card bg-surface-card rounded-2xl border border-surface-muted p-8">
+    <div id="progressSection" class="hidden mt-6 card bg-surface-card rounded-2xl p-8">
         <div class="flex items-center gap-3 mb-5">
-            <div class="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-                <span class="material-icons-outlined text-accent text-lg">hourglass_top</span>
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-accent/10 to-accent/[0.04] flex items-center justify-center">
+                <span class="material-icons-outlined text-accent text-[18px] animate-spin" style="animation-duration: 2s;">hourglass_top</span>
             </div>
-            <h2 class="text-sm font-semibold text-gray-800">處理進度</h2>
+            <h2 class="text-[14px] font-semibold text-gray-800">處理進度</h2>
         </div>
-        <div id="progressMessages" class="space-y-2 mb-5 max-h-40 overflow-y-auto"></div>
+        <div id="progressMessages" class="space-y-2 mb-5 max-h-44 overflow-y-auto pr-1"></div>
         <div>
-            <div class="w-full bg-surface rounded-full h-2">
-                <div id="progressBar" class="bg-accent h-2 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+            <div class="w-full bg-surface rounded-full h-2 overflow-hidden">
+                <div id="progressBar" class="bg-gradient-to-r from-accent to-accent-light h-2 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
             </div>
-            <p id="progressText" class="text-xs text-gray-400 mt-2"></p>
+            <p id="progressText" class="text-[11px] text-gray-400 mt-2 font-mono font-medium"></p>
         </div>
     </div>
 </div>
@@ -89,14 +90,14 @@
     dropZone.addEventListener('click', () => fileInput.click());
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
-        dropZone.classList.add('border-accent', 'bg-accent/5');
+        dropZone.classList.add('border-accent', 'bg-accent/[0.04]');
     });
     dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('border-accent', 'bg-accent/5');
+        dropZone.classList.remove('border-accent', 'bg-accent/[0.04]');
     });
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
-        dropZone.classList.remove('border-accent', 'bg-accent/5');
+        dropZone.classList.remove('border-accent', 'bg-accent/[0.04]');
         if (e.dataTransfer.files.length > 0) {
             fileInput.files = e.dataTransfer.files;
             onFileSelected();
@@ -108,15 +109,15 @@
         if (fileInput.files.length > 0) {
             const file = fileInput.files[0];
             dropText.textContent = file.name;
-            dropZone.classList.add('border-emerald-300', 'bg-emerald-50/50');
-            dropZone.querySelector('.text-xs')?.classList.add('hidden');
+            dropZone.classList.add('border-teal/40', 'bg-teal/[0.03]');
+            dropZone.classList.remove('border-surface-deep');
+            dropZone.querySelector('.text-\\[11px\\]')?.classList.add('hidden');
             submitBtn.disabled = false;
         }
     }
 
     // Upload
-    uploadForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
+    async function doUpload(overwrite = false) {
         submitBtn.disabled = true;
         submitBtn.textContent = '上傳中...';
 
@@ -127,14 +128,28 @@
         const week = document.getElementById('week_number').value;
 
         try {
-            const resp = await fetch(`/api/upload?year=${year}&week_number=${week}`, {
-                method: 'POST',
-                body: formData,
-            });
+            const url = `/api/upload?year=${year}&week_number=${week}` + (overwrite ? '&overwrite=true' : '');
+            const resp = await fetch(url, { method: 'POST', body: formData });
             const data = await resp.json();
 
+            if (resp.status === 409) {
+                // Duplicate detected — show confirmation dialog
+                const detail = data.detail;
+                const msg = `${detail.message}\n\n` +
+                    `狀態: ${detail.existing_status}\n` +
+                    `建立時間: ${detail.existing_created_at}\n\n` +
+                    `是否要覆蓋此記錄？（原有案例資料將被刪除）`;
+                if (confirm(msg)) {
+                    await doUpload(true);
+                } else {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '上傳並開始處理';
+                }
+                return;
+            }
+
             if (!resp.ok) {
-                alert('上傳失敗: ' + (data.detail || '未知錯誤'));
+                alert('上傳失敗: ' + (data.detail?.message || data.detail || '未知錯誤'));
                 submitBtn.disabled = false;
                 submitBtn.textContent = '上傳並開始處理';
                 return;
@@ -147,6 +162,11 @@
             submitBtn.disabled = false;
             submitBtn.textContent = '上傳並開始處理';
         }
+    }
+
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await doUpload();
     });
 
     function connectSSE(reportId) {
@@ -162,7 +182,7 @@
 
         evtSource.addEventListener('prefilter', (e) => {
             const data = JSON.parse(e.data);
-            addMessage(messages, `預篩選完成: ${data.total_slides} 頁中有 ${data.candidate_count} 頁為候選案例頁`, 'emerald');
+            addMessage(messages, `預篩選完成: ${data.total_slides} 頁中有 ${data.candidate_count} 頁為候選案例頁`, 'teal');
         });
 
         evtSource.addEventListener('vlm_progress', (e) => {
@@ -176,8 +196,8 @@
             const data = JSON.parse(e.data);
             evtSource.close();
             progressBar.style.width = '100%';
-            progressBar.classList.replace('bg-accent', 'bg-emerald-500');
-            addMessage(messages, `處理完成！共 ${data.case_pages} 個案例頁。`, 'emerald');
+            progressBar.className = progressBar.className.replace('from-accent to-accent-light', 'from-teal to-teal-light');
+            addMessage(messages, `處理完成！共 ${data.case_pages} 個案例頁。`, 'teal');
             setTimeout(() => { window.location.href = `/reports/${data.report_id}/review`; }, 1500);
         });
 
@@ -189,14 +209,16 @@
                 addMessage(messages, '處理過程發生錯誤', 'red');
             }
             evtSource.close();
-            progressBar.classList.replace('bg-accent', 'bg-red-500');
+            progressBar.className = progressBar.className.replace('from-accent to-accent-light', 'from-red-500 to-red-400');
         });
     }
 
     function addMessage(container, text, color) {
         const div = document.createElement('div');
-        div.className = `text-xs flex items-center gap-2 text-${color === 'accent' ? 'gray-600' : color + '-600'}`;
-        div.innerHTML = `<span class="w-1 h-1 rounded-full bg-${color === 'accent' ? 'accent' : color + '-400'}"></span>${text}`;
+        const dotColor = color === 'accent' ? 'bg-accent' : color === 'teal' ? 'bg-teal' : 'bg-red-400';
+        const textColor = color === 'accent' ? 'text-gray-600' : color === 'teal' ? 'text-teal' : 'text-red-500';
+        div.className = `text-[12px] flex items-center gap-2.5 ${textColor} font-medium`;
+        div.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${dotColor} shrink-0"></span>${text}`;
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
     }

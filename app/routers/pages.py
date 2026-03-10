@@ -1,7 +1,8 @@
 """Jinja2 page rendering routes."""
 
-import logging
 from pathlib import Path
+
+from loguru import logger
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -9,8 +10,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user_payload, verify_token
-from app.config import settings
+from app.core.auth import get_current_user_payload, verify_token
+from app.core.config import settings
 from app.models.database import get_db
 from app.models.fa_case import FACase, FAReport, FAUser, FAWeeklyPeriod
 
@@ -63,7 +64,7 @@ async def home_page(request: Request, db: AsyncSession = Depends(get_db)):
             for row in result.all()
         ]
     except Exception:
-        logging.getLogger(__name__).warning("DB unavailable, showing empty data")
+        logger.warning("DB unavailable, showing empty data")
 
     return templates.TemplateResponse("home.html", {
         "request": request,
