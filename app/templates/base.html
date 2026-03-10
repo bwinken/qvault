@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}FA Insight Harvester{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white border-b border-gray-200 px-6 py-3">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-6">
+                <a href="/" class="text-lg font-bold text-blue-700">FA Insight Harvester</a>
+                <a href="/" class="text-gray-600 hover:text-gray-900">首頁</a>
+                <a href="/upload" class="text-gray-600 hover:text-gray-900">上傳周報</a>
+                <a href="/cases" class="text-gray-600 hover:text-gray-900">案例搜尋</a>
+            </div>
+            <div class="flex items-center space-x-4">
+                {% if user %}
+                <span class="text-sm text-gray-500">{{ user.sub }}</span>
+                <a href="/auth/logout" class="text-sm text-red-500 hover:text-red-700">登出</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

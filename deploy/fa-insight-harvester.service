@@ -1,0 +1,15 @@
+[Unit]
+Description=FA Insight Harvester Web App
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/home/%i/fa-insight-harvester
+EnvironmentFile=/home/%i/fa-insight-harvester/.env
+ExecStart=/home/%i/.local/bin/uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

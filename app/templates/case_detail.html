@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}案例詳情 — FA Insight Harvester{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <a href="/cases" class="text-blue-600 hover:text-blue-800 text-sm">&larr; 返回列表</a>
+        <h1 class="text-2xl font-bold text-gray-800 mt-1">案例詳情 #{{ case.id }}</h1>
+    </div>
+    <div class="space-x-2">
+        <button id="editBtn" onclick="toggleEdit()" class="px-4 py-2 border rounded-lg hover:bg-gray-100">編輯</button>
+        <button id="deleteBtn" onclick="deleteCase()" class="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50">刪除</button>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Slide image -->
+    <div>
+        {% if case.slide_image_path %}
+        <img src="/uploads/{{ case.slide_image_path }}" alt="Slide {{ case.slide_number }}"
+            class="w-full rounded-lg shadow cursor-pointer hover:shadow-lg"
+            onclick="window.open('/uploads/{{ case.slide_image_path }}', '_blank')">
+        <p class="text-sm text-gray-400 mt-2 text-center">Slide {{ case.slide_number }} — 點擊放大</p>
+        {% else %}
+        <div class="bg-gray-100 rounded-lg p-16 text-center text-gray-400">無圖片</div>
+        {% endif %}
+    </div>
+
+    <!-- Fields -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <div id="fieldsContainer" class="space-y-3">
+            {% set fields = [
+                ('date', 'Date', case.date),
+                ('customer', 'Customer', case.customer),
+                ('device', 'Device', case.device),
+                ('model', 'Model', case.model),
+                ('defect_mode', 'Defect Mode', case.defect_mode),
+                ('defect_rate_raw', 'Defect Rate', case.defect_rate_raw),
+                ('defect_lots', 'Defect Lots', case.defect_lots|join(', ') if case.defect_lots else ''),
+                ('fab_assembly', 'FAB/Assembly', case.fab_assembly),
+                ('fa_status', 'FA Status', case.fa_status),
+                ('follow_up', 'Follow Up', case.follow_up),
+            ] %}
+
+            {% for key, label, value in fields %}
+            <div class="flex items-start">
+                <span class="w-36 text-sm font-medium text-gray-500 shrink-0 pt-1">{{ label }}</span>
+                <span class="text-sm text-gray-900 field-display" data-field="{{ key }}">{{ value or '-' }}</span>
+                <input type="text" class="hidden field-edit text-sm border rounded px-2 py-1 flex-1"
+                    data-field="{{ key }}" value="{{ value or '' }}">
+            </div>
+            {% endfor %}
+        </div>
+
+        <div id="editActions" class="hidden mt-6 flex space-x-2">
+            <button onclick="saveEdit()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">儲存</button>
+            <button onclick="toggleEdit()" class="border px-4 py-2 rounded-lg hover:bg-gray-100">取消</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let editing = false;
+
+    function toggleEdit() {
+        editing = !editing;
+        document.querySelectorAll('.field-display').forEach(el => el.classList.toggle('hidden', editing));
+        document.querySelectorAll('.field-edit').forEach(el => el.classList.toggle('hidden', !editing));
+        document.getElementById('editActions').classList.toggle('hidden', !editing);
+    }
+
+    async function saveEdit() {
+        const data = {};
+        document.querySelectorAll('.field-edit').forEach(input => {
+            const field = input.dataset.field;
+            let value = input.value.trim();
+            if (field === 'defect_lots') {
+                data[field] = value ? value.split(',').map(s => s.trim()) : [];
+            } else {
+                data[field] = value || null;
+            }
+        });
+
+        try {
+            const resp = await fetch('/api/cases/{{ case.id }}', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                const err = await resp.json();
+                alert('儲存失敗: ' + (err.detail || '未知錯誤'));
+            }
+        } catch (err) {
+            alert('儲存失敗: ' + err.message);
+        }
+    }
+
+    async function deleteCase() {
+        if (!confirm('確定要刪除此案例嗎？此操作無法復原。')) return;
+
+        try {
+            const resp = await fetch('/api/cases/{{ case.id }}', { method: 'DELETE' });
+            if (resp.ok) {
+                window.location.href = '/cases';
+            } else {
+                alert('刪除失敗');
+            }
+        } catch (err) {
+            alert('刪除失敗: ' + err.message);
+        }
+    }
+</script>
+{% endblock %}

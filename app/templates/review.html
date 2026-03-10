@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}審核周報 — FA Insight Harvester{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">審核提取結果</h1>
+        <p class="text-gray-500 mt-1">{{ report.filename }}</p>
+    </div>
+    <button id="saveAllBtn" onclick="confirmSave()"
+        class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-medium disabled:bg-gray-400">
+        確認儲存所有案例
+    </button>
+</div>
+
+<div id="loading" class="text-center py-16">
+    <p class="text-gray-500">載入提取結果中...</p>
+</div>
+
+<div id="slidesContainer" class="hidden space-y-4"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const reportId = {{ report.id }};
+    let extractionResults = [];
+
+    // Load results
+    async function loadResults() {
+        try {
+            const resp = await fetch(`/api/upload/${reportId}/results`);
+            if (!resp.ok) {
+                document.getElementById('loading').innerHTML =
+                    '<p class="text-red-500">載入失敗，請稍後再試</p>';
+                return;
+            }
+            const data = await resp.json();
+            extractionResults = data.slides;
+            renderSlides();
+        } catch (err) {
+            document.getElementById('loading').innerHTML =
+                '<p class="text-red-500">載入失敗: ' + err.message + '</p>';
+        }
+    }
+
+    function renderSlides() {
+        document.getElementById('loading').classList.add('hidden');
+        const container = document.getElementById('slidesContainer');
+        container.classList.remove('hidden');
+
+        // Case pages first, then skipped/non-case pages
+        const casePages = extractionResults.filter(s => s.is_case_page);
+        const errorPages = extractionResults.filter(s => s.error && !s.skipped);
+        const otherPages = extractionResults.filter(s => !s.is_case_page && !s.error && s.skipped);
+
+        if (casePages.length > 0) {
+            container.innerHTML += '<h2 class="text-lg font-semibold text-gray-700">案例頁</h2>';
+            casePages.forEach(slide => container.appendChild(createCaseCard(slide)));
+        }
+
+        if (errorPages.length > 0) {
+            container.innerHTML += '<h2 class="text-lg font-semibold text-red-600 mt-6">提取失敗</h2>';
+            errorPages.forEach(slide => {
+                const card = document.createElement('div');
+                card.className = 'bg-red-50 border border-red-200 rounded-lg p-4';
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="font-medium">Slide ${slide.slide_number}</span>
+                        <span class="text-red-500 text-sm">${slide.error}</span>
+                    </div>`;
+                container.appendChild(card);
+            });
+        }
+
+        if (otherPages.length > 0) {
+            const collapsible = document.createElement('details');
+            collapsible.className = 'mt-6';
+            collapsible.innerHTML = `
+                <summary class="text-gray-500 cursor-pointer hover:text-gray-700">
+                    跳過的頁面 (${otherPages.length} 頁)
+                </summary>
+                <div class="mt-2 text-sm text-gray-400">
+                    ${otherPages.map(s => 'Slide ' + s.slide_number).join(', ')}
+                </div>`;
+            container.appendChild(collapsible);
+        }
+    }
+
+    function createCaseCard(slide) {
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-lg shadow p-4';
+        card.dataset.slideNumber = slide.slide_number;
+
+        const fields = slide.data || {};
+        const fieldDefs = [
+            ['date', 'Date'],
+            ['customer', 'Customer'],
+            ['device', 'Device'],
+            ['model', 'Model'],
+            ['defect_mode', 'Defect Mode'],
+            ['defect_rate_raw', 'Defect Rate'],
+            ['defect_lots', 'Defect Lots'],
+            ['fab_assembly', 'FAB/Assembly'],
+            ['fa_status', 'FA Status'],
+            ['follow_up', 'Follow Up'],
+        ];
+
+        let fieldsHtml = fieldDefs.map(([key, label]) => {
+            const value = key === 'defect_lots'
+                ? (Array.isArray(fields[key]) ? fields[key].join(', ') : (fields[key] || ''))
+                : (fields[key] || fields[key.replace('_raw', '')] || '');
+            return `
+                <div class="flex items-start py-1">
+                    <span class="w-32 text-sm font-medium text-gray-500 shrink-0">${label}</span>
+                    <input type="text" data-field="${key}" value="${escapeHtml(value)}"
+                        class="flex-1 text-sm border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5">
+                </div>`;
+        }).join('');
+
+        card.innerHTML = `
+            <div class="flex gap-4">
+                <div class="w-64 shrink-0">
+                    <img src="/uploads/${slide.image_path}" alt="Slide ${slide.slide_number}"
+                        class="w-full rounded border border-gray-200 cursor-pointer hover:shadow-lg"
+                        onclick="window.open('/uploads/${slide.image_path}', '_blank')">
+                    <p class="text-xs text-gray-400 mt-1 text-center">Slide ${slide.slide_number}</p>
+                </div>
+                <div class="flex-1 space-y-1">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-green-600">案例頁</span>
+                    </div>
+                    ${fieldsHtml}
+                </div>
+            </div>`;
+
+        return card;
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    async function confirmSave() {
+        const btn = document.getElementById('saveAllBtn');
+        btn.disabled = true;
+        btn.textContent = '儲存中...';
+
+        // Collect edited data from case cards
+        const cards = document.querySelectorAll('[data-slide-number]');
+        const cases = [];
+
+        cards.forEach(card => {
+            const slideNum = parseInt(card.dataset.slideNumber);
+            const slide = extractionResults.find(s => s.slide_number === slideNum);
+            if (!slide || !slide.is_case_page) return;
+
+            const caseData = {
+                slide_number: slideNum,
+                image_path: slide.image_path,
+                raw_vlm_response: slide.raw_vlm_response || null,
+            };
+
+            card.querySelectorAll('input[data-field]').forEach(input => {
+                const field = input.dataset.field;
+                let value = input.value.trim();
+                if (field === 'defect_lots') {
+                    caseData[field] = value ? value.split(',').map(s => s.trim()) : [];
+                } else {
+                    caseData[field] = value || null;
+                }
+            });
+
+            cases.push(caseData);
+        });
+
+        if (cases.length === 0) {
+            alert('沒有案例可儲存');
+            btn.disabled = false;
+            btn.textContent = '確認儲存所有案例';
+            return;
+        }
+
+        try {
+            const resp = await fetch(`/api/reports/${reportId}/confirm`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cases),
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json();
+                alert('儲存失敗: ' + (err.detail || '未知錯誤'));
+                btn.disabled = false;
+                btn.textContent = '確認儲存所有案例';
+                return;
+            }
+
+            const data = await resp.json();
+            alert(`已儲存 ${data.case_count} 個案例！`);
+            window.location.href = '/';
+        } catch (err) {
+            alert('儲存失敗: ' + err.message);
+            btn.disabled = false;
+            btn.textContent = '確認儲存所有案例';
+        }
+    }
+
+    loadResults();
+</script>
+{% endblock %}

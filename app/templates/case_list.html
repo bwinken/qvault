@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}案例搜尋 — FA Insight Harvester{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold text-gray-800 mb-6">案例搜尋</h1>
+
+<!-- Search & Filters -->
+<div class="bg-white rounded-lg shadow p-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div class="md:col-span-2">
+            <input type="text" id="searchQuery" placeholder="全文搜尋 (客戶、Device、缺陷模式...)"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div>
+            <input type="text" id="filterCustomer" placeholder="客戶篩選"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div>
+            <input type="text" id="filterDevice" placeholder="Device 篩選"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        <div>
+            <button onclick="searchCases()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                搜尋
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Results -->
+<div id="resultsContainer">
+    <p class="text-gray-500 text-center py-8">請輸入搜尋條件或直接點擊搜尋查看所有案例</p>
+</div>
+
+<!-- Pagination -->
+<div id="pagination" class="hidden flex items-center justify-between mt-4">
+    <p id="paginationInfo" class="text-sm text-gray-500"></p>
+    <div class="space-x-2">
+        <button id="prevBtn" onclick="changePage(-1)" class="px-3 py-1 border rounded text-sm hover:bg-gray-100" disabled>上一頁</button>
+        <button id="nextBtn" onclick="changePage(1)" class="px-3 py-1 border rounded text-sm hover:bg-gray-100">下一頁</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentPage = 1;
+    const pageSize = 20;
+
+    // Search on Enter
+    document.getElementById('searchQuery').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') searchCases();
+    });
+
+    async function searchCases() {
+        const q = document.getElementById('searchQuery').value.trim();
+        const customer = document.getElementById('filterCustomer').value.trim();
+        const device = document.getElementById('filterDevice').value.trim();
+
+        const params = new URLSearchParams({ page: currentPage, page_size: pageSize });
+        if (q) params.set('q', q);
+        if (customer) params.set('customer', customer);
+        if (device) params.set('device', device);
+
+        try {
+            const resp = await fetch('/api/cases?' + params.toString());
+            const data = await resp.json();
+            renderResults(data);
+        } catch (err) {
+            document.getElementById('resultsContainer').innerHTML =
+                '<p class="text-red-500 text-center py-8">搜尋失敗: ' + err.message + '</p>';
+        }
+    }
+
+    function renderResults(data) {
+        const container = document.getElementById('resultsContainer');
+
+        if (data.items.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-center py-8">未找到符合條件的案例</p>';
+            document.getElementById('pagination').classList.add('hidden');
+            return;
+        }
+
+        let html = '<div class="bg-white rounded-lg shadow overflow-hidden"><table class="min-w-full divide-y divide-gray-200">';
+        html += `<thead class="bg-gray-50"><tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Device</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Defect Mode</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"></th>
+        </tr></thead><tbody class="divide-y divide-gray-200">`;
+
+        data.items.forEach(c => {
+            html += `<tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 text-sm text-gray-900">${c.date || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${c.customer || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${c.device || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-500">${c.model || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">${c.defect_mode || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-500">${c.defect_rate_raw || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">${c.fa_status || '-'}</td>
+                <td class="px-4 py-3 text-sm">
+                    <a href="/cases/${c.id}" class="text-blue-600 hover:text-blue-800">詳情</a>
+                </td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+
+        // Pagination
+        const totalPages = Math.ceil(data.total / pageSize);
+        document.getElementById('pagination').classList.remove('hidden');
+        document.getElementById('paginationInfo').textContent =
+            `共 ${data.total} 筆，第 ${data.page}/${totalPages} 頁`;
+        document.getElementById('prevBtn').disabled = data.page <= 1;
+        document.getElementById('nextBtn').disabled = data.page >= totalPages;
+    }
+
+    function changePage(delta) {
+        currentPage += delta;
+        if (currentPage < 1) currentPage = 1;
+        searchCases();
+    }
+
+    // Load all on page load
+    searchCases();
+</script>
+{% endblock %}
