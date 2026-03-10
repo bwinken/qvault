@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 from openai import AsyncOpenAI
@@ -107,7 +108,7 @@ async def extract_single_slide(
 async def extract_slides_batch(
     image_paths: list[Path],
     slide_numbers: list[int],
-    on_progress: callable | None = None,
+    on_progress: Callable | None = None,
 ) -> list[tuple[int, VLMSlideResult | None, str | None, str | None]]:
     """Extract data from multiple slides with concurrency control and retry.
 

@@ -2,71 +2,101 @@
 {% block title %}{{ period.year }}-W{{ "%02d"|format(period.week_number) }} — FA Insight Harvester{% endblock %}
 
 {% block content %}
-<a href="/" class="text-blue-600 hover:text-blue-800 text-sm">&larr; 返回首頁</a>
+<!-- Breadcrumb & Header -->
+<a href="/" class="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-accent transition-colors mb-2">
+    <span class="material-icons-outlined text-sm">arrow_back</span>返回首頁
+</a>
 
-<div class="flex items-center justify-between mt-2 mb-6">
-    <div>
-        <h1 class="text-2xl font-bold text-gray-800">
-            {{ period.year }}-W{{ "%02d"|format(period.week_number) }}
-        </h1>
-        <p class="text-gray-500">{{ period.start_date }} ~ {{ period.end_date }}</p>
+<div class="flex items-center justify-between mt-1 mb-8">
+    <div class="flex items-center gap-4">
+        <div class="w-14 h-14 rounded-xl bg-accent/8 flex flex-col items-center justify-center border border-accent/10">
+            <span class="text-[10px] font-semibold text-accent/70 uppercase leading-none">Week</span>
+            <span class="text-xl font-bold text-accent leading-tight">{{ period.week_number }}</span>
+        </div>
+        <div>
+            <h1 class="text-2xl font-semibold text-gray-900 tracking-tight">
+                {{ period.year }}-W{{ "%02d"|format(period.week_number) }}
+            </h1>
+            <p class="text-sm text-gray-400 mt-0.5">{{ period.start_date }} ~ {{ period.end_date }}</p>
+        </div>
     </div>
-    <a href="/upload" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+    <a href="/upload"
+        class="inline-flex items-center gap-2 bg-accent text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-accent/90 transition-colors shadow-sm">
+        <span class="material-icons-outlined text-lg">add</span>
         上傳周報
     </a>
 </div>
 
-<!-- Reports in this week -->
-<h2 class="text-lg font-semibold text-gray-700 mb-3">本周報告</h2>
+<!-- Reports -->
+<div class="mb-8">
+    <div class="flex items-center gap-2 mb-4">
+        <span class="material-icons-outlined text-gray-400 text-lg">description</span>
+        <h2 class="text-sm font-semibold text-gray-700">本周報告</h2>
+    </div>
 
-{% if reports %}
-<div class="bg-white rounded-lg shadow overflow-hidden mb-8">
-    <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-            <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">檔案名稱</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">上傳者</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">頁數</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">狀態</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">上傳時間</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200">
-            {% for r in reports %}
-            <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 text-sm text-gray-900">{{ r.report.filename }}</td>
-                <td class="px-6 py-4 text-sm text-gray-500">{{ r.uploader_name }}</td>
-                <td class="px-6 py-4 text-sm text-gray-500">{{ r.report.total_slides }}</td>
-                <td class="px-6 py-4 text-sm">
-                    {% if r.report.status == 'done' %}
-                    <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">完成</span>
-                    {% elif r.report.status == 'review' %}
-                    <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">待審核</span>
-                    {% elif r.report.status == 'processing' %}
-                    <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700">處理中</span>
-                    {% else %}
-                    <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700">錯誤</span>
-                    {% endif %}
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-500">{{ r.report.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                <td class="px-6 py-4 text-sm">
-                    {% if r.report.status == 'review' %}
-                    <a href="/reports/{{ r.report.id }}/review" class="text-blue-600 hover:text-blue-800">審核</a>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    {% if reports %}
+    <div class="space-y-2">
+        {% for r in reports %}
+        <div class="card bg-surface-card rounded-xl border border-surface-muted p-4 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <span class="material-icons-outlined text-blue-400 text-base">description</span>
+                </div>
+                <div>
+                    <div class="text-sm font-medium text-gray-800">{{ r.report.filename }}</div>
+                    <div class="text-xs text-gray-400 mt-0.5">
+                        {{ r.uploader_name }} · {{ r.report.total_slides }} 頁 · {{ r.report.created_at.strftime('%Y-%m-%d %H:%M') }}
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                {% if r.report.status == 'done' %}
+                <span class="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 font-medium">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>完成
+                </span>
+                {% elif r.report.status == 'review' %}
+                <span class="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100 font-medium">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>待審核
+                </span>
+                {% elif r.report.status == 'processing' %}
+                <span class="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 font-medium">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>處理中
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100 font-medium">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>錯誤
+                </span>
+                {% endif %}
+
+                {% if r.report.status == 'review' %}
+                <a href="/reports/{{ r.report.id }}/review"
+                    class="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-light transition-colors font-medium">
+                    審核<span class="material-icons-outlined text-sm">arrow_forward</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card bg-surface-card rounded-xl border border-surface-muted p-8 text-center">
+        <p class="text-sm text-gray-400">本周尚無報告</p>
+    </div>
+    {% endif %}
 </div>
-{% else %}
-<p class="text-gray-500 mb-8">本周尚無報告</p>
-{% endif %}
 
-<!-- Cases in this week (loaded via HTMX) -->
-<h2 class="text-lg font-semibold text-gray-700 mb-3">本周案例</h2>
-<div id="weekCases" class="text-gray-500">載入中...</div>
+<!-- Cases -->
+<div>
+    <div class="flex items-center gap-2 mb-4">
+        <span class="material-icons-outlined text-gray-400 text-lg">bug_report</span>
+        <h2 class="text-sm font-semibold text-gray-700">本周案例</h2>
+    </div>
+    <div id="weekCases">
+        <div class="card bg-surface-card rounded-xl border border-surface-muted p-8 text-center">
+            <p class="text-sm text-gray-400 animate-pulse">載入中...</p>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -78,35 +108,43 @@
             const data = await resp.json();
 
             if (data.items.length === 0) {
-                container.textContent = '本周尚無案例';
+                container.innerHTML = `
+                    <div class="card bg-surface-card rounded-xl border border-surface-muted p-8 text-center">
+                        <p class="text-sm text-gray-400">本周尚無案例</p>
+                    </div>`;
                 return;
             }
 
-            let html = '<div class="bg-white rounded-lg shadow overflow-hidden"><table class="min-w-full divide-y divide-gray-200">';
-            html += `<thead class="bg-gray-50"><tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Device</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Defect Mode</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"></th>
-            </tr></thead><tbody class="divide-y divide-gray-200">`;
-
+            let html = '<div class="space-y-2">';
             data.items.forEach(c => {
-                html += `<tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 text-sm">${c.date || '-'}</td>
-                    <td class="px-4 py-3 text-sm">${c.customer || '-'}</td>
-                    <td class="px-4 py-3 text-sm">${c.device || '-'}</td>
-                    <td class="px-4 py-3 text-sm max-w-xs truncate">${c.defect_mode || '-'}</td>
-                    <td class="px-4 py-3 text-sm max-w-xs truncate">${c.fa_status || '-'}</td>
-                    <td class="px-4 py-3 text-sm"><a href="/cases/${c.id}" class="text-blue-600 hover:text-blue-800">詳情</a></td>
-                </tr>`;
+                html += `
+                <a href="/cases/${c.id}" class="card bg-surface-card rounded-xl border border-surface-muted p-4 flex items-center justify-between group block hover:border-accent/20">
+                    <div class="flex items-center gap-4 min-w-0">
+                        <div class="w-9 h-9 rounded-lg bg-accent/8 flex items-center justify-center shrink-0">
+                            <span class="material-icons-outlined text-accent/60 text-base">bug_report</span>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium text-gray-800 group-hover:text-accent transition-colors truncate">
+                                ${c.customer || '-'} / ${c.device || '-'}
+                            </div>
+                            <div class="text-xs text-gray-400 mt-0.5 truncate">
+                                ${c.defect_mode || '-'} · ${c.date || '-'}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0 ml-4">
+                        <span class="text-xs text-gray-400 max-w-[200px] truncate">${c.fa_status || '-'}</span>
+                        <span class="material-icons-outlined text-gray-200 group-hover:text-accent transition-colors text-lg">chevron_right</span>
+                    </div>
+                </a>`;
             });
-
-            html += '</tbody></table></div>';
+            html += '</div>';
             container.innerHTML = html;
         } catch (err) {
-            container.textContent = '載入失敗: ' + err.message;
+            container.innerHTML = `
+                <div class="card bg-surface-card rounded-xl border border-red-100 p-8 text-center">
+                    <p class="text-sm text-red-400">載入失敗: ${err.message}</p>
+                </div>`;
         }
     }
 

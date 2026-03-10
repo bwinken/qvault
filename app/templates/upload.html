@@ -2,50 +2,68 @@
 {% block title %}上傳周報 — FA Insight Harvester{% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold text-gray-800 mb-6">上傳周報</h1>
+<!-- Header -->
+<div class="mb-8">
+    <h1 class="text-2xl font-semibold text-gray-900 tracking-tight">上傳周報</h1>
+    <p class="text-sm text-gray-400 mt-1">上傳 .pptx 格式的失效分析周報，系統將自動提取案例</p>
+</div>
 
 <div class="max-w-2xl">
-    <form id="uploadForm" class="bg-white rounded-lg shadow p-6 space-y-6">
+    <form id="uploadForm" class="card bg-surface-card rounded-2xl border border-surface-muted p-8 space-y-6">
         <!-- Week selection -->
-        <div class="grid grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">年度</label>
-                <input type="number" id="year" name="year" value="{{ now().year if now else 2026 }}"
-                    class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">第幾周</label>
-                <input type="number" id="week_number" name="week_number" min="1" max="53"
-                    class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+        <div>
+            <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 block">周次選擇</label>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1.5">年度</label>
+                    <input type="number" id="year" name="year"
+                        class="w-full border border-surface-muted rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all bg-surface">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1.5">第幾周</label>
+                    <input type="number" id="week_number" name="week_number" min="1" max="53"
+                        class="w-full border border-surface-muted rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all bg-surface">
+                </div>
             </div>
         </div>
 
         <!-- File upload -->
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">周報檔案 (.pptx)</label>
+            <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 block">檔案上傳</label>
             <div id="dropZone"
-                class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer">
-                <p class="text-gray-500" id="dropText">拖放 .pptx 檔案到這裡，或點擊選擇檔案</p>
+                class="border-2 border-dashed border-surface-muted rounded-2xl p-10 text-center hover:border-accent/40 hover:bg-accent/[0.03] transition-all cursor-pointer group">
+                <div class="flex flex-col items-center">
+                    <div class="w-14 h-14 rounded-full bg-accent/8 flex items-center justify-center mb-4 group-hover:bg-accent/15 transition-colors">
+                        <span class="material-icons-outlined text-accent text-2xl">upload_file</span>
+                    </div>
+                    <p class="text-sm text-gray-500" id="dropText">拖放 .pptx 檔案到這裡</p>
+                    <p class="text-xs text-gray-300 mt-1">或點擊選擇檔案</p>
+                </div>
                 <input type="file" id="fileInput" name="file" accept=".pptx" class="hidden">
             </div>
         </div>
 
         <button type="submit" id="submitBtn"
-            class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+            class="w-full bg-accent text-white py-3 rounded-xl font-medium text-sm hover:bg-accent/90 transition-colors shadow-sm disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:shadow-none"
             disabled>
             上傳並開始處理
         </button>
     </form>
 
-    <!-- Progress section (hidden initially) -->
-    <div id="progressSection" class="hidden mt-6 bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-medium text-gray-800 mb-4">處理進度</h2>
-        <div id="progressMessages" class="space-y-2"></div>
-        <div class="mt-4">
-            <div class="w-full bg-gray-200 rounded-full h-3">
-                <div id="progressBar" class="bg-blue-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+    <!-- Progress section -->
+    <div id="progressSection" class="hidden mt-6 card bg-surface-card rounded-2xl border border-surface-muted p-8">
+        <div class="flex items-center gap-3 mb-5">
+            <div class="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
+                <span class="material-icons-outlined text-accent text-lg">hourglass_top</span>
             </div>
-            <p id="progressText" class="text-sm text-gray-500 mt-1"></p>
+            <h2 class="text-sm font-semibold text-gray-800">處理進度</h2>
+        </div>
+        <div id="progressMessages" class="space-y-2 mb-5 max-h-40 overflow-y-auto"></div>
+        <div>
+            <div class="w-full bg-surface rounded-full h-2">
+                <div id="progressBar" class="bg-accent h-2 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+            </div>
+            <p id="progressText" class="text-xs text-gray-400 mt-2"></p>
         </div>
     </div>
 </div>
@@ -60,7 +78,7 @@
     const uploadForm = document.getElementById('uploadForm');
     const progressSection = document.getElementById('progressSection');
 
-    // Set default week number to current ISO week
+    // Set default week number
     const now = new Date();
     const startOfYear = new Date(now.getFullYear(), 0, 1);
     const weekNum = Math.ceil(((now - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
@@ -71,14 +89,14 @@
     dropZone.addEventListener('click', () => fileInput.click());
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
-        dropZone.classList.add('border-blue-400', 'bg-blue-50');
+        dropZone.classList.add('border-accent', 'bg-accent/5');
     });
     dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+        dropZone.classList.remove('border-accent', 'bg-accent/5');
     });
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
-        dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+        dropZone.classList.remove('border-accent', 'bg-accent/5');
         if (e.dataTransfer.files.length > 0) {
             fileInput.files = e.dataTransfer.files;
             onFileSelected();
@@ -90,7 +108,8 @@
         if (fileInput.files.length > 0) {
             const file = fileInput.files[0];
             dropText.textContent = file.name;
-            dropZone.classList.add('border-green-400', 'bg-green-50');
+            dropZone.classList.add('border-emerald-300', 'bg-emerald-50/50');
+            dropZone.querySelector('.text-xs')?.classList.add('hidden');
             submitBtn.disabled = false;
         }
     }
@@ -121,7 +140,6 @@
                 return;
             }
 
-            // Show progress and connect SSE
             progressSection.classList.remove('hidden');
             connectSSE(data.report_id);
         } catch (err) {
@@ -139,15 +157,12 @@
 
         evtSource.addEventListener('status', (e) => {
             const data = JSON.parse(e.data);
-            addMessage(messages, data.message, 'blue');
+            addMessage(messages, data.message, 'accent');
         });
 
         evtSource.addEventListener('prefilter', (e) => {
             const data = JSON.parse(e.data);
-            addMessage(messages,
-                `預篩選完成: ${data.total_slides} 頁中有 ${data.candidate_count} 頁為候選案例頁`,
-                'green'
-            );
+            addMessage(messages, `預篩選完成: ${data.total_slides} 頁中有 ${data.candidate_count} 頁為候選案例頁`, 'emerald');
         });
 
         evtSource.addEventListener('vlm_progress', (e) => {
@@ -161,16 +176,9 @@
             const data = JSON.parse(e.data);
             evtSource.close();
             progressBar.style.width = '100%';
-            progressBar.classList.remove('bg-blue-600');
-            progressBar.classList.add('bg-green-500');
-            addMessage(messages,
-                `處理完成！共 ${data.case_pages} 個案例頁。`,
-                'green'
-            );
-            // Redirect to review page
-            setTimeout(() => {
-                window.location.href = `/reports/${data.report_id}/review`;
-            }, 1500);
+            progressBar.classList.replace('bg-accent', 'bg-emerald-500');
+            addMessage(messages, `處理完成！共 ${data.case_pages} 個案例頁。`, 'emerald');
+            setTimeout(() => { window.location.href = `/reports/${data.report_id}/review`; }, 1500);
         });
 
         evtSource.addEventListener('error', (e) => {
@@ -181,16 +189,16 @@
                 addMessage(messages, '處理過程發生錯誤', 'red');
             }
             evtSource.close();
-            progressBar.classList.remove('bg-blue-600');
-            progressBar.classList.add('bg-red-500');
+            progressBar.classList.replace('bg-accent', 'bg-red-500');
         });
     }
 
     function addMessage(container, text, color) {
         const div = document.createElement('div');
-        div.className = `text-sm text-${color}-600`;
-        div.textContent = text;
+        div.className = `text-xs flex items-center gap-2 text-${color === 'accent' ? 'gray-600' : color + '-600'}`;
+        div.innerHTML = `<span class="w-1 h-1 rounded-full bg-${color === 'accent' ? 'accent' : color + '-400'}"></span>${text}`;
         container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
     }
 </script>
 {% endblock %}

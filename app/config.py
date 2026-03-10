@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     # App
     app_base_url: str = "http://localhost:8000"
     secret_key: str = "change-me-to-a-random-string"
+    dev_skip_auth: bool = False
 
     model_config = {"env_file": ".env"}
 

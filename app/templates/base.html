@@ -7,33 +7,94 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+                    colors: {
+                        sidebar: { DEFAULT: '#1b1b2f', hover: '#272745', active: '#32325d' },
+                        accent: { DEFAULT: '#7c5cfc', light: '#a78bfa', dim: 'rgba(124,92,252,0.12)' },
+                        surface: { DEFAULT: '#f4f4f8', card: '#ffffff', muted: '#e8e8ee' },
+                    },
+                },
+            },
+        }
+    </script>
     <style>
         [x-cloak] { display: none !important; }
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .nav-item { transition: all 0.15s ease; }
+        .nav-item:hover { background: rgba(255,255,255,0.06); }
+        .nav-item.active { background: rgba(124,92,252,0.18); color: #a78bfa; }
+        .card { transition: box-shadow 0.2s ease, transform 0.15s ease; }
+        .card:hover { box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     </style>
     {% block head %}{% endblock %}
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <!-- Navigation -->
-    <nav class="bg-white border-b border-gray-200 px-6 py-3">
-        <div class="max-w-7xl mx-auto flex items-center justify-between">
-            <div class="flex items-center space-x-6">
-                <a href="/" class="text-lg font-bold text-blue-700">FA Insight Harvester</a>
-                <a href="/" class="text-gray-600 hover:text-gray-900">首頁</a>
-                <a href="/upload" class="text-gray-600 hover:text-gray-900">上傳周報</a>
-                <a href="/cases" class="text-gray-600 hover:text-gray-900">案例搜尋</a>
+<body class="bg-surface min-h-screen flex">
+    <!-- Sidebar -->
+    <aside class="w-60 bg-sidebar text-white flex flex-col fixed h-full z-30">
+        <!-- Logo -->
+        <div class="px-5 py-5 flex items-center gap-3 border-b border-white/10">
+            <div class="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
+                <span class="material-icons-outlined text-white text-lg">insights</span>
             </div>
-            <div class="flex items-center space-x-4">
-                {% if user %}
-                <span class="text-sm text-gray-500">{{ user.sub }}</span>
-                <a href="/auth/logout" class="text-sm text-red-500 hover:text-red-700">登出</a>
-                {% endif %}
+            <div>
+                <div class="text-sm font-semibold tracking-tight">FA Insight</div>
+                <div class="text-[10px] text-white/40 font-medium tracking-wider uppercase">Harvester</div>
             </div>
         </div>
-    </nav>
+
+        <!-- Navigation -->
+        <nav class="flex-1 px-3 py-4 space-y-1">
+            <a href="/" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/70 hover:text-white
+                {% if request.url.path == '/' %}active{% endif %}">
+                <span class="material-icons-outlined text-lg">home</span>
+                <span>首頁總覽</span>
+            </a>
+            <a href="/upload" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/70 hover:text-white
+                {% if request.url.path == '/upload' %}active{% endif %}">
+                <span class="material-icons-outlined text-lg">cloud_upload</span>
+                <span>上傳周報</span>
+            </a>
+            <a href="/cases" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/70 hover:text-white
+                {% if request.url.path.startswith('/cases') %}active{% endif %}">
+                <span class="material-icons-outlined text-lg">search</span>
+                <span>案例搜尋</span>
+            </a>
+        </nav>
+
+        <!-- User -->
+        <div class="px-4 py-4 border-t border-white/10">
+            {% if user %}
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-full bg-accent/30 flex items-center justify-center">
+                        <span class="text-xs font-medium text-accent-light">{{ user.sub[:1]|upper }}</span>
+                    </div>
+                    <span class="text-xs text-white/60">{{ user.sub }}</span>
+                </div>
+                <a href="/auth/logout" class="text-white/30 hover:text-red-400 transition-colors" title="登出">
+                    <span class="material-icons-outlined text-lg">logout</span>
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </aside>
 
     <!-- Main content -->
-    <main class="max-w-7xl mx-auto px-6 py-8">
-        {% block content %}{% endblock %}
+    <main class="ml-60 flex-1 min-h-screen">
+        <div class="max-w-6xl mx-auto px-8 py-8 fade-in">
+            {% block content %}{% endblock %}
+        </div>
     </main>
 
     {% block scripts %}{% endblock %}

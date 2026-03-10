@@ -1,5 +1,8 @@
 """Jinja2 page rendering routes."""
 
+import logging
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -7,15 +10,20 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user_payload, verify_token
+from app.config import settings
 from app.models.database import get_db
 from app.models.fa_case import FACase, FAReport, FAUser, FAWeeklyPeriod
 
 router = APIRouter(tags=["pages"])
-templates = Jinja2Templates(directory="app/templates")
+templates = Jinja2Templates(directory=Path(__file__).resolve().parent.parent / "templates")
+
+_DEV_USER = {"sub": "dev", "org_id": "dev"}
 
 
 def _get_user_or_redirect(request: Request) -> dict | None:
     """Try to get current user from cookie. Returns None if not authenticated."""
+    if settings.dev_skip_auth:
+        return _DEV_USER
     token = request.cookies.get("access_token")
     if not token:
         return None
@@ -32,26 +40,30 @@ async def home_page(request: Request, db: AsyncSession = Depends(get_db)):
         return RedirectResponse(url="/auth/login")
 
     # Get weekly periods with counts
-    result = await db.execute(
-        select(
-            FAWeeklyPeriod,
-            func.count(func.distinct(FAReport.id)).label("report_count"),
-            func.count(FACase.id).label("case_count"),
+    weeks: list = []
+    try:
+        result = await db.execute(
+            select(
+                FAWeeklyPeriod,
+                func.count(func.distinct(FAReport.id)).label("report_count"),
+                func.count(FACase.id).label("case_count"),
+            )
+            .outerjoin(FAReport)
+            .outerjoin(FACase)
+            .group_by(FAWeeklyPeriod.id)
+            .order_by(FAWeeklyPeriod.year.desc(), FAWeeklyPeriod.week_number.desc())
+            .limit(20)
         )
-        .outerjoin(FAReport)
-        .outerjoin(FACase)
-        .group_by(FAWeeklyPeriod.id)
-        .order_by(FAWeeklyPeriod.year.desc(), FAWeeklyPeriod.week_number.desc())
-        .limit(20)
-    )
-    weeks = [
-        {
-            "period": row[0],
-            "report_count": row[1],
-            "case_count": row[2],
-        }
-        for row in result.all()
-    ]
+        weeks = [
+            {
+                "period": row[0],
+                "report_count": row[1],
+                "case_count": row[2],
+            }
+            for row in result.all()
+        ]
+    except Exception:
+        logging.getLogger(__name__).warning("DB unavailable, showing empty data")
 
     return templates.TemplateResponse("home.html", {
         "request": request,

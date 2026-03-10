@@ -1,6 +1,7 @@
 """FA Insight Harvester — FastAPI application entry point."""
 
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -12,6 +13,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 app = FastAPI(
     title="FA Insight Harvester",
     description="失效分析周報結構化提取系統",
@@ -19,10 +22,14 @@ app = FastAPI(
 )
 
 # Static files (CSS, JS)
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+static_dir = BASE_DIR / "app" / "static"
+static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Serve uploaded images
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+uploads_dir = BASE_DIR / "uploads"
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 # Routers
 app.include_router(auth.router)

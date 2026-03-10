@@ -2,19 +2,27 @@
 {% block title %}審核周報 — FA Insight Harvester{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-6">
+<!-- Header -->
+<div class="flex items-center justify-between mb-8">
     <div>
-        <h1 class="text-2xl font-bold text-gray-800">審核提取結果</h1>
-        <p class="text-gray-500 mt-1">{{ report.filename }}</p>
+        <h1 class="text-2xl font-semibold text-gray-900 tracking-tight">審核提取結果</h1>
+        <div class="flex items-center gap-2 mt-1">
+            <span class="material-icons-outlined text-gray-300 text-sm">description</span>
+            <p class="text-sm text-gray-400">{{ report.filename }}</p>
+        </div>
     </div>
     <button id="saveAllBtn" onclick="confirmSave()"
-        class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-medium disabled:bg-gray-400">
+        class="inline-flex items-center gap-2 bg-emerald-500 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-600 transition-colors shadow-sm disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none">
+        <span class="material-icons-outlined text-lg">check_circle</span>
         確認儲存所有案例
     </button>
 </div>
 
-<div id="loading" class="text-center py-16">
-    <p class="text-gray-500">載入提取結果中...</p>
+<div id="loading" class="flex flex-col items-center py-24">
+    <div class="w-12 h-12 rounded-full bg-accent/8 flex items-center justify-center mb-4 animate-pulse">
+        <span class="material-icons-outlined text-accent text-2xl">hourglass_top</span>
+    </div>
+    <p class="text-sm text-gray-400">載入提取結果中...</p>
 </div>
 
 <div id="slidesContainer" class="hidden space-y-4"></div>
@@ -25,13 +33,12 @@
     const reportId = {{ report.id }};
     let extractionResults = [];
 
-    // Load results
     async function loadResults() {
         try {
             const resp = await fetch(`/api/upload/${reportId}/results`);
             if (!resp.ok) {
                 document.getElementById('loading').innerHTML =
-                    '<p class="text-red-500">載入失敗，請稍後再試</p>';
+                    '<p class="text-sm text-red-500">載入失敗，請稍後再試</p>';
                 return;
             }
             const data = await resp.json();
@@ -39,7 +46,7 @@
             renderSlides();
         } catch (err) {
             document.getElementById('loading').innerHTML =
-                '<p class="text-red-500">載入失敗: ' + err.message + '</p>';
+                `<p class="text-sm text-red-500">載入失敗: ${err.message}</p>`;
         }
     }
 
@@ -48,38 +55,50 @@
         const container = document.getElementById('slidesContainer');
         container.classList.remove('hidden');
 
-        // Case pages first, then skipped/non-case pages
         const casePages = extractionResults.filter(s => s.is_case_page);
         const errorPages = extractionResults.filter(s => s.error && !s.skipped);
         const otherPages = extractionResults.filter(s => !s.is_case_page && !s.error && s.skipped);
 
         if (casePages.length > 0) {
-            container.innerHTML += '<h2 class="text-lg font-semibold text-gray-700">案例頁</h2>';
+            const header = document.createElement('div');
+            header.className = 'flex items-center gap-2 mb-2';
+            header.innerHTML = `
+                <span class="material-icons-outlined text-emerald-500 text-lg">check_circle</span>
+                <h2 class="text-sm font-semibold text-gray-700">案例頁 (${casePages.length})</h2>`;
+            container.appendChild(header);
             casePages.forEach(slide => container.appendChild(createCaseCard(slide)));
         }
 
         if (errorPages.length > 0) {
-            container.innerHTML += '<h2 class="text-lg font-semibold text-red-600 mt-6">提取失敗</h2>';
+            const header = document.createElement('div');
+            header.className = 'flex items-center gap-2 mt-8 mb-2';
+            header.innerHTML = `
+                <span class="material-icons-outlined text-red-400 text-lg">error</span>
+                <h2 class="text-sm font-semibold text-red-500">提取失敗 (${errorPages.length})</h2>`;
+            container.appendChild(header);
+
             errorPages.forEach(slide => {
                 const card = document.createElement('div');
-                card.className = 'bg-red-50 border border-red-200 rounded-lg p-4';
+                card.className = 'card bg-red-50/50 border border-red-100 rounded-xl p-4 flex items-center justify-between';
                 card.innerHTML = `
-                    <div class="flex items-center justify-between">
-                        <span class="font-medium">Slide ${slide.slide_number}</span>
-                        <span class="text-red-500 text-sm">${slide.error}</span>
-                    </div>`;
+                    <div class="flex items-center gap-3">
+                        <span class="material-icons-outlined text-red-300">image</span>
+                        <span class="text-sm font-medium text-gray-700">Slide ${slide.slide_number}</span>
+                    </div>
+                    <span class="text-xs text-red-400">${slide.error}</span>`;
                 container.appendChild(card);
             });
         }
 
         if (otherPages.length > 0) {
             const collapsible = document.createElement('details');
-            collapsible.className = 'mt-6';
+            collapsible.className = 'mt-8 card bg-surface-card rounded-xl border border-surface-muted';
             collapsible.innerHTML = `
-                <summary class="text-gray-500 cursor-pointer hover:text-gray-700">
+                <summary class="px-5 py-3 text-xs text-gray-400 cursor-pointer hover:text-gray-600 transition-colors flex items-center gap-2">
+                    <span class="material-icons-outlined text-sm">expand_more</span>
                     跳過的頁面 (${otherPages.length} 頁)
                 </summary>
-                <div class="mt-2 text-sm text-gray-400">
+                <div class="px-5 pb-4 text-xs text-gray-300">
                     ${otherPages.map(s => 'Slide ' + s.slide_number).join(', ')}
                 </div>`;
             container.appendChild(collapsible);
@@ -88,46 +107,48 @@
 
     function createCaseCard(slide) {
         const card = document.createElement('div');
-        card.className = 'bg-white rounded-lg shadow p-4';
+        card.className = 'card bg-surface-card rounded-2xl border border-surface-muted p-5';
         card.dataset.slideNumber = slide.slide_number;
 
         const fields = slide.data || {};
         const fieldDefs = [
-            ['date', 'Date'],
-            ['customer', 'Customer'],
-            ['device', 'Device'],
-            ['model', 'Model'],
-            ['defect_mode', 'Defect Mode'],
-            ['defect_rate_raw', 'Defect Rate'],
-            ['defect_lots', 'Defect Lots'],
-            ['fab_assembly', 'FAB/Assembly'],
-            ['fa_status', 'FA Status'],
-            ['follow_up', 'Follow Up'],
+            ['date', 'Date', 'event'],
+            ['customer', 'Customer', 'business'],
+            ['device', 'Device', 'memory'],
+            ['model', 'Model', 'label'],
+            ['defect_mode', 'Defect Mode', 'report_problem'],
+            ['defect_rate_raw', 'Defect Rate', 'percent'],
+            ['defect_lots', 'Defect Lots', 'inventory'],
+            ['fab_assembly', 'FAB/Assembly', 'factory'],
+            ['fa_status', 'FA Status', 'flag'],
+            ['follow_up', 'Follow Up', 'update'],
         ];
 
-        let fieldsHtml = fieldDefs.map(([key, label]) => {
+        let fieldsHtml = fieldDefs.map(([key, label, icon]) => {
             const value = key === 'defect_lots'
                 ? (Array.isArray(fields[key]) ? fields[key].join(', ') : (fields[key] || ''))
                 : (fields[key] || fields[key.replace('_raw', '')] || '');
             return `
-                <div class="flex items-start py-1">
-                    <span class="w-32 text-sm font-medium text-gray-500 shrink-0">${label}</span>
+                <div class="flex items-center gap-2 py-1.5">
+                    <span class="material-icons-outlined text-gray-300 text-sm">${icon}</span>
+                    <span class="w-24 text-[11px] font-medium text-gray-400 uppercase tracking-wider shrink-0">${label}</span>
                     <input type="text" data-field="${key}" value="${escapeHtml(value)}"
-                        class="flex-1 text-sm border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-0.5">
+                        class="flex-1 text-sm border-b border-transparent hover:border-gray-200 focus:border-accent focus:outline-none px-1 py-0.5 transition-colors bg-transparent">
                 </div>`;
         }).join('');
 
         card.innerHTML = `
-            <div class="flex gap-4">
-                <div class="w-64 shrink-0">
+            <div class="flex gap-5">
+                <div class="w-56 shrink-0">
                     <img src="/uploads/${slide.image_path}" alt="Slide ${slide.slide_number}"
-                        class="w-full rounded border border-gray-200 cursor-pointer hover:shadow-lg"
+                        class="w-full rounded-xl border border-surface-muted cursor-pointer hover:shadow-lg transition-shadow"
                         onclick="window.open('/uploads/${slide.image_path}', '_blank')">
-                    <p class="text-xs text-gray-400 mt-1 text-center">Slide ${slide.slide_number}</p>
+                    <p class="text-[10px] text-gray-300 mt-1.5 text-center">Slide ${slide.slide_number}</p>
                 </div>
-                <div class="flex-1 space-y-1">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm font-semibold text-green-600">案例頁</span>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span class="text-xs font-semibold text-emerald-600">案例頁</span>
                     </div>
                     ${fieldsHtml}
                 </div>
@@ -145,9 +166,8 @@
     async function confirmSave() {
         const btn = document.getElementById('saveAllBtn');
         btn.disabled = true;
-        btn.textContent = '儲存中...';
+        btn.innerHTML = '<span class="material-icons-outlined text-lg animate-spin">refresh</span>儲存中...';
 
-        // Collect edited data from case cards
         const cards = document.querySelectorAll('[data-slide-number]');
         const cases = [];
 
@@ -178,7 +198,7 @@
         if (cases.length === 0) {
             alert('沒有案例可儲存');
             btn.disabled = false;
-            btn.textContent = '確認儲存所有案例';
+            btn.innerHTML = '<span class="material-icons-outlined text-lg">check_circle</span>確認儲存所有案例';
             return;
         }
 
@@ -193,7 +213,7 @@
                 const err = await resp.json();
                 alert('儲存失敗: ' + (err.detail || '未知錯誤'));
                 btn.disabled = false;
-                btn.textContent = '確認儲存所有案例';
+                btn.innerHTML = '<span class="material-icons-outlined text-lg">check_circle</span>確認儲存所有案例';
                 return;
             }
 
@@ -203,7 +223,7 @@
         } catch (err) {
             alert('儲存失敗: ' + err.message);
             btn.disabled = false;
-            btn.textContent = '確認儲存所有案例';
+            btn.innerHTML = '<span class="material-icons-outlined text-lg">check_circle</span>確認儲存所有案例';
         }
     }
 

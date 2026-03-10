@@ -41,7 +41,7 @@
 | 層 | 技術 |
 |---|---|
 | 後端 | FastAPI |
-| 前端 | Jinja2 + HTMX + TailwindCSS (CDN) |
+| 前端 | Jinja2 + HTMX + TailwindCSS (CDN) + Material Icons |
 | 資料庫 | PostgreSQL + pgvector |
 | 認證 | OAuth 2.0 (Auth Center, JWT RS256) |
 | PPTX 解析 | python-pptx + LibreOffice + poppler-utils |
@@ -97,7 +97,10 @@ cp .env.example .env
 # 資料庫遷移
 uv run alembic upgrade head
 
-# 啟動開發伺服器
+# 啟動開發伺服器（跳過 OAuth 驗證）
+DEV_SKIP_AUTH=true uv run fastapi run app/main.py
+
+# 或使用 uvicorn（支援 --reload）
 uv run uvicorn app.main:app --reload
 ```
 

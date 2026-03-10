@@ -2,25 +2,32 @@
 {% block title %}案例搜尋 — FA Insight Harvester{% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold text-gray-800 mb-6">案例搜尋</h1>
+<!-- Header -->
+<div class="mb-8">
+    <h1 class="text-2xl font-semibold text-gray-900 tracking-tight">案例搜尋</h1>
+    <p class="text-sm text-gray-400 mt-1">搜尋與篩選所有失效分析案例</p>
+</div>
 
 <!-- Search & Filters -->
-<div class="bg-white rounded-lg shadow p-4 mb-6">
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div class="md:col-span-2">
+<div class="card bg-surface-card rounded-2xl border border-surface-muted p-5 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+        <div class="md:col-span-5 relative">
+            <span class="material-icons-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 text-lg">search</span>
             <input type="text" id="searchQuery" placeholder="全文搜尋 (客戶、Device、缺陷模式...)"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                class="w-full border border-surface-muted rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all bg-surface">
         </div>
-        <div>
+        <div class="md:col-span-3">
             <input type="text" id="filterCustomer" placeholder="客戶篩選"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                class="w-full border border-surface-muted rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all bg-surface">
         </div>
-        <div>
-            <input type="text" id="filterDevice" placeholder="Device 篩選"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+        <div class="md:col-span-2">
+            <input type="text" id="filterDevice" placeholder="Device"
+                class="w-full border border-surface-muted rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all bg-surface">
         </div>
-        <div>
-            <button onclick="searchCases()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+        <div class="md:col-span-2">
+            <button onclick="searchCases()"
+                class="w-full bg-accent text-white py-2.5 rounded-xl text-sm font-medium hover:bg-accent/90 transition-colors inline-flex items-center justify-center gap-2">
+                <span class="material-icons-outlined text-base">search</span>
                 搜尋
             </button>
         </div>
@@ -29,15 +36,26 @@
 
 <!-- Results -->
 <div id="resultsContainer">
-    <p class="text-gray-500 text-center py-8">請輸入搜尋條件或直接點擊搜尋查看所有案例</p>
+    <div class="flex flex-col items-center py-16">
+        <div class="w-14 h-14 rounded-full bg-surface-muted flex items-center justify-center mb-4">
+            <span class="material-icons-outlined text-gray-300 text-2xl">manage_search</span>
+        </div>
+        <p class="text-sm text-gray-400">輸入搜尋條件或直接點擊搜尋查看所有案例</p>
+    </div>
 </div>
 
 <!-- Pagination -->
-<div id="pagination" class="hidden flex items-center justify-between mt-4">
-    <p id="paginationInfo" class="text-sm text-gray-500"></p>
-    <div class="space-x-2">
-        <button id="prevBtn" onclick="changePage(-1)" class="px-3 py-1 border rounded text-sm hover:bg-gray-100" disabled>上一頁</button>
-        <button id="nextBtn" onclick="changePage(1)" class="px-3 py-1 border rounded text-sm hover:bg-gray-100">下一頁</button>
+<div id="pagination" class="hidden flex items-center justify-between mt-4 px-1">
+    <p id="paginationInfo" class="text-xs text-gray-400"></p>
+    <div class="flex gap-2">
+        <button id="prevBtn" onclick="changePage(-1)"
+            class="inline-flex items-center gap-1 px-3 py-1.5 border border-surface-muted rounded-lg text-xs text-gray-500 hover:bg-surface transition-colors disabled:opacity-40" disabled>
+            <span class="material-icons-outlined text-sm">chevron_left</span>上一頁
+        </button>
+        <button id="nextBtn" onclick="changePage(1)"
+            class="inline-flex items-center gap-1 px-3 py-1.5 border border-surface-muted rounded-lg text-xs text-gray-500 hover:bg-surface transition-colors">
+            下一頁<span class="material-icons-outlined text-sm">chevron_right</span>
+        </button>
     </div>
 </div>
 {% endblock %}
@@ -47,7 +65,6 @@
     let currentPage = 1;
     const pageSize = 20;
 
-    // Search on Enter
     document.getElementById('searchQuery').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') searchCases();
     });
@@ -68,7 +85,7 @@
             renderResults(data);
         } catch (err) {
             document.getElementById('resultsContainer').innerHTML =
-                '<p class="text-red-500 text-center py-8">搜尋失敗: ' + err.message + '</p>';
+                `<div class="text-center py-12"><p class="text-sm text-red-500">搜尋失敗: ${err.message}</p></div>`;
         }
     }
 
@@ -76,39 +93,48 @@
         const container = document.getElementById('resultsContainer');
 
         if (data.items.length === 0) {
-            container.innerHTML = '<p class="text-gray-500 text-center py-8">未找到符合條件的案例</p>';
+            container.innerHTML = `
+                <div class="flex flex-col items-center py-16">
+                    <div class="w-14 h-14 rounded-full bg-surface-muted flex items-center justify-center mb-4">
+                        <span class="material-icons-outlined text-gray-300 text-2xl">search_off</span>
+                    </div>
+                    <p class="text-sm text-gray-400">未找到符合條件的案例</p>
+                </div>`;
             document.getElementById('pagination').classList.add('hidden');
             return;
         }
 
-        let html = '<div class="bg-white rounded-lg shadow overflow-hidden"><table class="min-w-full divide-y divide-gray-200">';
-        html += `<thead class="bg-gray-50"><tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Device</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Defect Mode</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"></th>
-        </tr></thead><tbody class="divide-y divide-gray-200">`;
-
+        let html = '<div class="space-y-2">';
         data.items.forEach(c => {
-            html += `<tr class="hover:bg-gray-50">
-                <td class="px-4 py-3 text-sm text-gray-900">${c.date || '-'}</td>
-                <td class="px-4 py-3 text-sm text-gray-900">${c.customer || '-'}</td>
-                <td class="px-4 py-3 text-sm text-gray-900">${c.device || '-'}</td>
-                <td class="px-4 py-3 text-sm text-gray-500">${c.model || '-'}</td>
-                <td class="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">${c.defect_mode || '-'}</td>
-                <td class="px-4 py-3 text-sm text-gray-500">${c.defect_rate_raw || '-'}</td>
-                <td class="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">${c.fa_status || '-'}</td>
-                <td class="px-4 py-3 text-sm">
-                    <a href="/cases/${c.id}" class="text-blue-600 hover:text-blue-800">詳情</a>
-                </td>
-            </tr>`;
-        });
+            const statusColors = {
+                'Open': 'bg-amber-50 text-amber-600 border-amber-100',
+                'Closed': 'bg-emerald-50 text-emerald-600 border-emerald-100',
+            };
+            const statusClass = statusColors[c.fa_status] || 'bg-gray-50 text-gray-500 border-gray-100';
 
-        html += '</tbody></table></div>';
+            html += `
+            <a href="/cases/${c.id}" class="card bg-surface-card rounded-xl border border-surface-muted p-4 flex items-center justify-between group block hover:border-accent/20">
+                <div class="flex items-center gap-5 min-w-0">
+                    <div class="w-9 h-9 rounded-lg bg-accent/8 flex items-center justify-center shrink-0">
+                        <span class="material-icons-outlined text-accent/60 text-base">bug_report</span>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="text-sm font-medium text-gray-900 group-hover:text-accent transition-colors truncate">
+                            ${c.customer || '-'} / ${c.device || '-'}
+                        </div>
+                        <div class="text-xs text-gray-400 mt-0.5 truncate">
+                            ${c.defect_mode || '-'} · ${c.model || '-'} · ${c.date || '-'}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4 shrink-0 ml-4">
+                    <span class="text-xs text-gray-400">${c.defect_rate_raw || ''}</span>
+                    <span class="text-[11px] px-2.5 py-0.5 rounded-full border ${statusClass} font-medium">${c.fa_status || '-'}</span>
+                    <span class="material-icons-outlined text-gray-200 group-hover:text-accent transition-colors text-lg">chevron_right</span>
+                </div>
+            </a>`;
+        });
+        html += '</div>';
         container.innerHTML = html;
 
         // Pagination
@@ -126,7 +152,6 @@
         searchCases();
     }
 
-    // Load all on page load
     searchCases();
 </script>
 {% endblock %}
