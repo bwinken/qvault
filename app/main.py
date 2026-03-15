@@ -1,4 +1,4 @@
-"""FA Insight Harvester — FastAPI application entry point."""
+"""QVault — FastAPI application entry point."""
 
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="FA Insight Harvester",
+    title="QVault",
     description="失效分析周報結構化提取系統",
     version="0.1.0",
     lifespan=lifespan,
