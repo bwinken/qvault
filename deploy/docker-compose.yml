@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: qvault-pg
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PG_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${PG_USER:-qvault}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD is required}
+      POSTGRES_DB: ${PG_DB:-qvault}
+    volumes:
+      - ${PGDATA_DIR:-./pgdata}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-ONLY", "pg_isready", "-U", "${PG_USER:-qvault}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+    container_name: qvault-oauth2-proxy
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4180:4180"
+    environment:
+      # OIDC provider (Auth Center)
+      OAUTH2_PROXY_PROVIDER: oidc
+      OAUTH2_PROXY_OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:?OIDC_ISSUER_URL is required}
+      OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_CLIENT_ID:?OAUTH2_CLIENT_ID is required}
+      OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:?OAUTH2_CLIENT_SECRET is required}
+      OAUTH2_PROXY_REDIRECT_URL: ${OAUTH2_REDIRECT_URL:?OAUTH2_REDIRECT_URL is required}
+
+      # Cookie
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_COOKIE_SECRET:?OAUTH2_COOKIE_SECRET is required}
+      OAUTH2_PROXY_COOKIE_NAME: ${OAUTH2_COOKIE_NAME:-_qvault_oauth2}
+      OAUTH2_PROXY_COOKIE_SECURE: ${OAUTH2_COOKIE_SECURE:-false}
+      OAUTH2_PROXY_COOKIE_SAMESITE: lax
+
+      # Pass access token to Nginx via response header
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+
+      # Reverse proxy mode (trust X-Forwarded-* from Nginx)
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_REAL_CLIENT_IP_HEADER: X-Real-IP
+
+      # Listening
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+
+      # Allow all authenticated users (scope-based RBAC is in the app)
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy

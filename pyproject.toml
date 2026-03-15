@@ -1,7 +1,7 @@
 [project]
-name = "fa-insight-harvester"
+name = "qvault"
 version = "0.1.0"
-description = "失效分析周報結構化提取系統"
+description = "FA 案例管理平台 — 自動從周報提取失效分析案例"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.6",

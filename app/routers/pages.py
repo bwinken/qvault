@@ -25,14 +25,18 @@ _DEV_USER = {"sub": "dev", "org_id": "dev", "scopes": ["read", "write", "admin"]
 
 
 def _get_user_or_redirect(request: Request) -> dict | None:
-    """Try to get current user from cookie. Returns None if not authenticated."""
+    """Try to get current user from Authorization header (injected by Nginx/oauth2-proxy).
+
+    Returns None if not authenticated. In production, Nginx auth_request
+    handles the redirect to oauth2-proxy, so None should rarely occur.
+    """
     if settings.dev_skip_auth:
         return _DEV_USER
-    token = request.cookies.get("access_token")
-    if not token:
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
         return None
     try:
-        return verify_token(token)
+        return verify_token(auth_header[7:])
     except Exception:
         return None
 

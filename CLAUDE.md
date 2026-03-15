@@ -58,7 +58,7 @@ Services receive the client as a parameter (not via module-level globals). DB se
 
 ### Auth
 
-OAuth 2.0 Authorization Code flow with JWT RS256. Set `DEV_SKIP_AUTH=true` to bypass for local dev (returns a hardcoded dev user). Auth check is done per-route via `get_current_user_payload(request)`.
+Authentication is handled by **oauth2-proxy** (Docker container) + **Nginx** `auth_request`. The app never touches the OAuth flow directly — it only receives a verified JWT via the `Authorization: Bearer` header that Nginx injects from oauth2-proxy's `X-Auth-Request-Access-Token` response header. The app verifies the JWT with Auth Center's RS256 public key (`keys/public.pem`). Set `DEV_SKIP_AUTH=true` to bypass for local dev (returns a hardcoded dev user). Auth check is done per-route via `get_current_user_payload(request)`.
 
 ### Logging
 
