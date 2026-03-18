@@ -1,11 +1,24 @@
 from pathlib import Path
+from typing import Optional
+from urllib.parse import quote_plus
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    # ── Data root (all runtime paths derived from this) ──
+    data_dir: Optional[str] = None
+
+    # ── PostgreSQL primitives (DATABASE_URL auto-derived if not set) ──
+    pg_user: str = "qvault"
+    pg_password: str = "postgres"
+    pg_host: str = "localhost"
+    pg_port: int = 5432
+    pg_db: str = "qvault"
+
     # Database
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/qvault"
+    database_url: str = ""
     db_pool_size: int = 10
     db_max_overflow: int = 10
     db_pool_recycle: int = (
@@ -31,17 +44,41 @@ class Settings(BaseSettings):
     vlm_repetition_penalty: float = 1.0
 
     # Upload
-    upload_dir: str = "./uploads"
+    upload_dir: str = ""
     max_upload_size_mb: int = 100
 
     # Logging
-    log_dir: str = "./logs"
+    log_dir: str = ""
 
     # Auth (JWT verification — oauth2-proxy handles the OAuth flow)
-    auth_public_key_path: str = "./keys/public.pem"
+    auth_public_key_path: str = ""
     dev_skip_auth: bool = False
 
     model_config = {"env_file": ".env"}
+
+    @model_validator(mode="after")
+    def _derive_defaults(self) -> "Settings":
+        root = self.data_dir
+
+        # Derive paths from DATA_DIR when individual vars are not explicitly set
+        if not self.upload_dir:
+            self.upload_dir = f"{root}/uploads" if root else "./uploads"
+        if not self.log_dir:
+            self.log_dir = f"{root}/logs" if root else "./logs"
+        if not self.auth_public_key_path:
+            self.auth_public_key_path = (
+                f"{root}/keys/public.pem" if root else "./keys/public.pem"
+            )
+
+        # Derive DATABASE_URL from PG_* primitives when not explicitly set
+        if not self.database_url:
+            pw = quote_plus(self.pg_password)
+            self.database_url = (
+                f"postgresql+asyncpg://{self.pg_user}:{pw}"
+                f"@{self.pg_host}:{self.pg_port}/{self.pg_db}"
+            )
+
+        return self
 
     @property
     def upload_path(self) -> Path:

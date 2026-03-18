@@ -15,6 +15,20 @@ Browser → Nginx (:80)
 
 App 以 Python venv 跑在主機上（systemd 管理），PG + oauth2-proxy 用 Docker Compose。
 
+### 設定檔結構
+
+所有設定集中在 **一個 `.env` 檔** (`~/opt/qvault/.env`)，由 App、Docker Compose、systemd 共用：
+
+```
+DATA_DIR=/mnt/db/qvault          ← 設定一次，以下自動衍生
+├── uploads/                     ← UPLOAD_DIR (自動)
+├── logs/                        ← LOG_DIR (自動)
+├── keys/public.pem              ← AUTH_PUBLIC_KEY_PATH (自動)
+└── pgdata/                      ← PG volume mount (自動)
+
+PG_USER / PG_PASSWORD / PG_PORT  ← DATABASE_URL 自動衍生
+```
+
 ## 0. 設定 Proxy
 
 所有需要外網的指令（apt, uv, curl, docker pull）都透過 proxy：
@@ -67,34 +81,45 @@ git clone <repo-url> qvault && cd qvault
 bash deploy/setup.sh
 ```
 
-腳本會互動式引導：前置檢查 → 同步程式碼到 `~/opt/qvault` → Docker 設定 → 安裝 Python 依賴 → 建立 `.env` → Auth 公鑰 → DB 遷移 → systemd 服務 → Nginx
+腳本會互動式引導：前置檢查 → 同步程式碼 → 建立 `.env`（統一設定檔） → 資料目錄 → 公鑰 → Docker 服務 → Python 依賴 → DB 遷移 → systemd → Nginx
 
 ## 手動部署
 
 <details>
 <summary>展開手動步驟</summary>
 
+### 設定檔
+
+```bash
+cd ~/opt/qvault
+cp .env.example .env
+# 編輯 .env — 只需填入：
+#   DATA_DIR, PG_PASSWORD, VLM_BASE_URL, VLM_MODEL,
+#   OIDC_ISSUER_URL, OAUTH2_CLIENT_SECRET, OAUTH2_REDIRECT_URL
+chmod 600 .env
+```
+
+### 資料目錄
+
+```bash
+# DATA_DIR 下的子目錄（對應 .env 中的 DATA_DIR）
+mkdir -p /mnt/db/qvault/{uploads/images,logs,keys,pgdata}
+cp /path/to/public.pem /mnt/db/qvault/keys/public.pem
+```
+
 ### Docker 服務（PG + oauth2-proxy）
 
 ```bash
 cd deploy/
-# 建立 .env（填入 PG 密碼、OIDC 設定）
-# 產生 cookie secret: openssl rand -base64 32
+# docker-compose.yml 會自動讀取 ../.env
 docker compose up -d
 ```
 
-### 應用設定
+### Python 依賴 + DB 遷移
 
 ```bash
 cd ~/opt/qvault
 uv sync --no-dev
-
-cp .env.example .env
-# 編輯 .env，填入 DATABASE_URL、VLM 位址等
-
-mkdir -p keys uploads/images logs
-cp /path/to/public.pem keys/public.pem
-
 uv run alembic upgrade head
 ```
 
@@ -128,7 +153,8 @@ sudo nginx -t && sudo systemctl reload nginx
 ```bash
 cd ~/qvault && git pull
 cd ~/opt/qvault
-rsync -a --delete --exclude='.env' --exclude='uploads/' --exclude='logs/' --exclude='keys/' ...
+rsync -a --delete --exclude='.env' --exclude='.venv' \
+    ~/qvault/ ~/opt/qvault/
 uv sync --no-dev
 uv run alembic upgrade head
 systemctl --user restart qvault
@@ -142,15 +168,14 @@ systemctl --user restart qvault
 ~/opt/qvault/                     # 程式碼（setup.sh rsync 過來）
 ├── app/                          # 應用程式碼
 ├── .venv/                        # uv 管理的虛擬環境
-├── .env                          # 應用設定（DATABASE_URL, VLM 位址, 路徑）
+├── .env                          # 唯一設定檔（App + Docker 共用）
 ├── deploy/
-│   ├── docker-compose.yml        # PG + oauth2-proxy
-│   ├── .env                      # Docker 環境變數（PG 密碼、OIDC 設定）
-│   ├── qvault.service            # systemd unit
+│   ├── docker-compose.yml        # PG + oauth2-proxy（讀取 ../.env）
+│   ├── qvault.service            # systemd unit（讀取 ../.env）
 │   └── nginx.conf                # Nginx 模板
 └── alembic/                      # 資料庫遷移
 
-/mnt/db/qvault/                   # 持久化資料
+/mnt/db/qvault/                   # 持久化資料（DATA_DIR）
 ├── pgdata/                       # PostgreSQL 資料
 ├── uploads/images/               # 上傳的 PPTX/PDF/PNG
 ├── logs/                         # Loguru 日誌

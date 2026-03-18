@@ -3,6 +3,7 @@ services:
     image: pgvector/pgvector:pg16
     container_name: qvault-pg
     restart: unless-stopped
+    env_file: ../.env
     ports:
       - "127.0.0.1:${PG_PORT:-5432}:5432"
     environment:
@@ -10,7 +11,7 @@ services:
       POSTGRES_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD is required}
       POSTGRES_DB: ${PG_DB:-qvault}
     volumes:
-      - ${PGDATA_DIR:-/mnt/db/qvault/pgdata}:/var/lib/postgresql/data
+      - ${DATA_DIR:-/mnt/db/qvault}/pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "${PG_USER:-qvault}"]
       interval: 5s
@@ -21,6 +22,7 @@ services:
     image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
     container_name: qvault-oauth2-proxy
     restart: unless-stopped
+    env_file: ../.env
     ports:
       - "127.0.0.1:4180:4180"
     environment:
