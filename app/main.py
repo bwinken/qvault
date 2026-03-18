@@ -17,10 +17,31 @@ from app.core.auth import get_current_user_payload
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.routers import auth, cases, pages, triage, upload
+from app.services.vlm_extractor import reset_semaphore
 
 setup_logging()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _cleanup_stale_files() -> None:
+    """Remove extraction_results.json files older than 7 days (abandoned reviews)."""
+    import time
+
+    images_dir = settings.images_path
+    if not images_dir.exists():
+        return
+    cutoff = time.time() - 7 * 86400
+    count = 0
+    for results_file in images_dir.glob("*/extraction_results.json"):
+        try:
+            if results_file.stat().st_mtime < cutoff:
+                results_file.unlink()
+                count += 1
+        except OSError:
+            pass
+    if count:
+        logger.info("Cleaned up {} stale extraction result files", count)
 
 
 @asynccontextmanager
@@ -49,8 +70,14 @@ async def lifespan(app: FastAPI):
     app.state.vlm_client = vlm_client
     logger.info("VLM client created (timeout={}s)", settings.vlm_timeout)
 
+    # VLM concurrency semaphore (bound to current event loop)
+    reset_semaphore()
+
     # Background task tracking
     app.state.background_tasks: set[asyncio.Task] = set()
+
+    # Clean up stale files from abandoned reviews
+    _cleanup_stale_files()
 
     yield
 

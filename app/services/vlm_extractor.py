@@ -38,6 +38,12 @@ def _get_semaphore() -> asyncio.Semaphore:
     return _vlm_semaphore
 
 
+def reset_semaphore() -> None:
+    """Re-create the semaphore — call on startup to bind to the current event loop."""
+    global _vlm_semaphore
+    _vlm_semaphore = asyncio.Semaphore(settings.vlm_max_concurrency)
+
+
 # ---------------------------------------------------------------------------
 # Prompts
 # ---------------------------------------------------------------------------

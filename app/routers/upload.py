@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from app.core.auth import get_or_create_user, require_scope
+from app.core.tasks import track_task
 from app.core.config import settings
 from app.models.database import get_db
 from app.models.fa_case import FAReport, FAReportSlide, FAWeeklyPeriod
@@ -162,8 +163,7 @@ async def upload_report(
     task = asyncio.create_task(
         _process_report(request.app, report.id, pptx_path, report_dir, queue)
     )
-    request.app.state.background_tasks.add(task)
-    task.add_done_callback(request.app.state.background_tasks.discard)
+    track_task(task, request.app.state.background_tasks, "upload processing")
 
     return {"report_id": report.id, "status": "processing"}
 
@@ -231,6 +231,7 @@ async def _process_report(
     queue: asyncio.Queue,
 ):
     """Background task: parse PPTX → pre-filter → Stage 1 VLM classify → triage."""
+    slides_committed = False
     try:
         async with app.state.db_session() as db:
             # Step 1: Extract text for pre-filtering
@@ -251,6 +252,9 @@ async def _process_report(
                 {"type": "status", "data": {"message": "正在轉換投影片為圖片..."}}
             )
             images = await convert_pptx_to_images(pptx_path, output_dir)
+
+            # Source PPTX no longer needed (PDF + PNGs now in output_dir)
+            pptx_path.unlink(missing_ok=True)
 
             # Step 3: Pre-filter
             await queue.put(
@@ -349,6 +353,7 @@ async def _process_report(
             # Update report status to triage
             report.status = "triage"
             await db.commit()
+            slides_committed = True
 
             await queue.put(
                 {
@@ -389,8 +394,15 @@ async def _process_report(
                     await db.commit()
         except Exception:
             logger.exception("Failed to update report status to error")
+        # Clean up generated files if no slide records were committed
+        if not slides_committed:
+            shutil.rmtree(output_dir, ignore_errors=True)
+            logger.info("Cleaned up files for failed report {}", report_id)
         if is_cancel:
             raise
     finally:
         # Schedule cleanup so the queue doesn't leak if no SSE client drains it
-        asyncio.create_task(_evict_progress_after(report_id, _PROGRESS_TTL_SECONDS))
+        evict_task = asyncio.create_task(
+            _evict_progress_after(report_id, _PROGRESS_TTL_SECONDS)
+        )
+        track_task(evict_task, app.state.background_tasks, "progress eviction")

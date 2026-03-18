@@ -4,6 +4,7 @@ from loguru import logger
 from openai import AsyncOpenAI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 
 from app.core.config import settings
 from app.models.fa_case import FACase, FAReport, FAWeeklyPeriod
@@ -63,6 +64,18 @@ async def generate_weekly_summary(
     # Get all cases from this period's reports
     cases_result = await db.execute(
         select(FACase)
+        .options(
+            load_only(
+                FACase.customer,
+                FACase.device,
+                FACase.model,
+                FACase.defect_mode,
+                FACase.defect_rate_raw,
+                FACase.fab_assembly,
+                FACase.fa_status,
+                FACase.follow_up,
+            )
+        )
         .join(FAReport, FACase.report_id == FAReport.id)
         .where(FAReport.weekly_period_id == period_id)
         .order_by(FACase.id)

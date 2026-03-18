@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_scope
+from app.core.tasks import track_task
 from app.core.config import settings
 from app.models.database import get_db
 from app.models.fa_case import FAReport, FAReportSlide
@@ -155,8 +156,7 @@ async def trigger_extraction(
     task = asyncio.create_task(
         _run_extraction(request.app, report_id, case_slides, queue)
     )
-    request.app.state.background_tasks.add(task)
-    task.add_done_callback(request.app.state.background_tasks.discard)
+    track_task(task, request.app.state.background_tasks, "extraction")
 
     return {
         "report_id": report_id,
@@ -307,7 +307,10 @@ async def _run_extraction(
             raise
     finally:
         # Schedule cleanup so the queue doesn't leak if no SSE client drains it
-        asyncio.create_task(_evict_progress_after(report_id, _PROGRESS_TTL_SECONDS))
+        evict_task = asyncio.create_task(
+            _evict_progress_after(report_id, _PROGRESS_TTL_SECONDS)
+        )
+        track_task(evict_task, app.state.background_tasks, "progress eviction")
 
 
 @router.post("/slides/{slide_id}/reclassify")

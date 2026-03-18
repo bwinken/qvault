@@ -36,25 +36,44 @@ uv run pytest tests/test_foo.py::test_bar  # single test
 ```
 Upload .pptx → LibreOffice → PDF → pdftoppm → per-slide PNGs
   → keyword pre-filter (skip non-case slides)
-  → VLM structured extraction (concurrent, with retry)
-  → data cleaning → user review UI → confirm & save to DB
-  → generate text + image embeddings
+  → Stage 1: VLM classification (case vs non-case, concurrent + retry)
+  → Triage UI (user confirms/overrides classifications)
+  → Stage 2: VLM field extraction (10 structured fields, concurrent + retry)
+  → data cleaning → Review UI (user edits extracted fields)
+  → confirm & save to DB → generate text + image embeddings
+  → generate weekly summary via LLM
 ```
+
+Source PPTX is deleted after conversion. On processing error before DB commit, the entire output directory is cleaned up. Stale `extraction_results.json` files (from abandoned reviews) are purged on startup (7-day TTL).
 
 ### Resource lifecycle (lifespan)
 
 All shared connections are created in `app/main.py:lifespan` and stored on `app.state`:
-- `app.state.db_engine` / `app.state.db_session` — SQLAlchemy async engine + session factory
+- `app.state.db_engine` / `app.state.db_session` — SQLAlchemy async engine + session factory (pool_size, max_overflow, pool_recycle configurable via env)
 - `app.state.vlm_client` — single `AsyncOpenAI` client for both VLM extraction and embeddings
+- `app.state.background_tasks` — tracked `set[asyncio.Task]` for graceful shutdown
+
+On startup, lifespan also: resets the VLM concurrency semaphore (binds to current event loop), and cleans up stale extraction result files.
 
 Services receive the client as a parameter (not via module-level globals). DB sessions are obtained via `get_db(request)` dependency which reads from `request.app.state.db_session`.
 
 ### Key service roles
 
-- **`vlm_extractor.py`** — Sends slide images to VLM with `response_format` (structured output via Pydantic schema `VLMSlideResult`). Handles concurrency (`vlm_max_concurrency` semaphore) and retry.
+- **`vlm_extractor.py`** — Two-stage VLM pipeline (classify + extract) with `response_format` (structured output via Pydantic schemas). Handles concurrency (`vlm_max_concurrency` semaphore, reset on startup) and retry for transient errors.
 - **`embedding.py`** — Qwen3-VL Chat Embeddings API via `client.post("/embeddings", ...)` with messages format (not standard `client.embeddings.create`).
 - **`pptx_parser.py`** — PPTX → PDF → PNG conversion (requires LibreOffice + poppler-utils on system). Also does keyword-based pre-filtering.
 - **`data_cleaner.py`** — Post-extraction field normalization.
+- **`weekly_summary.py`** — Generates weekly summary from all cases in a period via LLM. Uses `load_only()` to avoid loading embedding vectors.
+- **`audit.py`** — Records user actions (upload, confirm, edit, delete) to `audit_logs` table.
+
+### Background tasks
+
+Use `track_task(task, app.state.background_tasks, "name")` from `app/core/tasks.py` for all background tasks. This replaces the raw `add_done_callback(discard)` pattern — it tracks the task for graceful shutdown AND logs exceptions that would otherwise be silently swallowed.
+
+### Admin endpoints
+
+- `POST /api/cases/regenerate-embeddings` — Regenerate missing embeddings (requires `admin` scope)
+- `POST /api/admin/archive-vlm-responses?days=90` — Null out `raw_vlm_response` on old cases to reclaim DB space (requires `admin` scope)
 
 ### Auth
 
@@ -74,7 +93,7 @@ PostgreSQL-only — uses `pgvector` (Vector columns), `ARRAY(Text)`, and GIN ind
 
 ## Environment
 
-All config via env vars or `.env` file (see `.env.example`). Loaded by `pydantic-settings` in `app/core/config.py`. Key vars: `DATABASE_URL`, `VLM_BASE_URL`, `VLM_MODEL`, `VLM_EMBEDDING_MODEL`, `DEV_SKIP_AUTH`.
+All config via env vars or `.env` file (see `.env.example`). Loaded by `pydantic-settings` in `app/core/config.py`. Key vars: `DATABASE_URL`, `VLM_BASE_URL`, `VLM_MODEL`, `VLM_EMBEDDING_MODEL`, `DEV_SKIP_AUTH`, `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `LOG_DIR`, `UPLOAD_DIR`.
 
 ## System dependencies
 

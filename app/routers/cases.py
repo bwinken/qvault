@@ -1,14 +1,15 @@
 """Case CRUD, review confirmation, and search routes."""
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from loguru import logger
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_or_create_user, require_scope
+from app.core.tasks import track_task
 from app.core.config import settings
 from app.models.database import get_db
 from app.models.fa_case import (
@@ -108,8 +109,7 @@ async def confirm_and_save(
     task = asyncio.create_task(
         _generate_embeddings_background(request.app, case_ids, weekly_period_id)
     )
-    request.app.state.background_tasks.add(task)
-    task.add_done_callback(request.app.state.background_tasks.discard)
+    track_task(task, request.app.state.background_tasks, "embedding generation")
 
     return {"status": "saved", "case_count": len(created_cases)}
 
@@ -610,10 +610,33 @@ async def regenerate_missing_embeddings(
     task = asyncio.create_task(
         _generate_embeddings_background(request.app, case_ids, weekly_period_id=None)
     )
-    request.app.state.background_tasks.add(task)
-    task.add_done_callback(request.app.state.background_tasks.discard)
+    track_task(task, request.app.state.background_tasks, "embedding regeneration")
 
     return {"status": "queued", "case_count": len(case_ids)}
+
+
+@router.post("/admin/archive-vlm-responses")
+async def archive_old_vlm_responses(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    days: int = Query(90, ge=7, description="Archive responses older than N days"),
+):
+    """Null out raw_vlm_response for old confirmed cases to reclaim DB space.
+
+    This is a maintenance endpoint — raw VLM responses are only useful for
+    debugging shortly after extraction.  After *days* have passed the
+    structured fields in the case record are the source of truth.
+    """
+    require_scope(request, "admin")
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    result = await db.execute(
+        update(FACase)
+        .where(FACase.created_at < cutoff)
+        .where(FACase.raw_vlm_response.isnot(None))
+        .values(raw_vlm_response=None)
+    )
+    await db.commit()
+    return {"status": "archived", "archived_count": result.rowcount}
 
 
 @router.get("/weeks")
