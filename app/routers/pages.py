@@ -4,14 +4,13 @@ from pathlib import Path
 
 from loguru import logger
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Security
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import verify_token
-from app.core.config import settings
+from app.core.auth import get_web_user
 from app.models.database import get_db
 from app.models.fa_case import FACase, FAReport, FAReportSlide, FAUser, FAWeeklyPeriod
 
@@ -20,48 +19,30 @@ templates = Jinja2Templates(
     directory=Path(__file__).resolve().parent.parent / "templates"
 )
 
-_DEV_USER = {"sub": "dev", "org_id": "dev", "scopes": ["read", "write", "admin"]}
 
-
-def _get_user_or_redirect(request: Request) -> dict | None:
-    """Try to get current user from Authorization header (injected by Nginx/oauth2-proxy).
-
-    Returns None if not authenticated. In production, Nginx auth_request
-    handles the redirect to oauth2-proxy, so None should rarely occur.
-    """
-    if settings.dev_skip_auth:
-        return _DEV_USER
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return None
-    try:
-        return verify_token(auth_header[7:])
-    except Exception:
-        return None
+def _user_ctx(request: Request, user: FAUser) -> dict:
+    """Build common template context from authenticated user."""
+    return {
+        "request": request,
+        "user": user,
+        "scopes": getattr(user, "jwt_scopes", []),
+    }
 
 
 @router.get("/", response_class=HTMLResponse)
-async def home_page(request: Request):
-    user = _get_user_or_redirect(request)
-    if not user:
-        return RedirectResponse(url="/auth/login")
-
-    return templates.TemplateResponse(
-        "home.html",
-        {
-            "request": request,
-            "user": user,
-            "scopes": user.get("scopes", []),
-        },
-    )
+async def home_page(
+    request: Request,
+    user: FAUser = Security(get_web_user, scopes=["read"]),
+):
+    return templates.TemplateResponse("home.html", _user_ctx(request, user))
 
 
 @router.get("/weeks", response_class=HTMLResponse)
-async def weeks_list_page(request: Request, db: AsyncSession = Depends(get_db)):
-    user = _get_user_or_redirect(request)
-    if not user:
-        return RedirectResponse(url="/auth/login")
-
+async def weeks_list_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
+):
     weeks: list = []
     try:
         result = await db.execute(
@@ -89,31 +70,16 @@ async def weeks_list_page(request: Request, db: AsyncSession = Depends(get_db)):
 
     return templates.TemplateResponse(
         "weeks_list.html",
-        {
-            "request": request,
-            "user": user,
-            "scopes": user.get("scopes", []),
-            "weeks": weeks,
-        },
+        {**_user_ctx(request, user), "weeks": weeks},
     )
 
 
 @router.get("/upload", response_class=HTMLResponse)
-async def upload_page(request: Request):
-    user = _get_user_or_redirect(request)
-    if not user:
-        return RedirectResponse(url="/auth/login")
-    if "write" not in user.get("scopes", []):
-        return RedirectResponse(url="/")
-
-    return templates.TemplateResponse(
-        "upload.html",
-        {
-            "request": request,
-            "user": user,
-            "scopes": user.get("scopes", []),
-        },
-    )
+async def upload_page(
+    request: Request,
+    user: FAUser = Security(get_web_user, scopes=["write"]),
+):
+    return templates.TemplateResponse("upload.html", _user_ctx(request, user))
 
 
 @router.get("/reports/{report_id}/triage", response_class=HTMLResponse)
@@ -121,11 +87,8 @@ async def triage_page(
     report_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
-    user = _get_user_or_redirect(request)
-    if not user:
-        return RedirectResponse(url="/auth/login")
-
     result = await db.execute(select(FAReport).where(FAReport.id == report_id))
     report = result.scalar_one_or_none()
     if not report:
@@ -138,7 +101,6 @@ async def triage_page(
     )
     slides = slides_result.scalars().all()
 
-    # Pass raw list — Jinja2 |tojson filter handles safe serialization
     slides_data = [
         {
             "id": s.id,
@@ -154,13 +116,7 @@ async def triage_page(
 
     return templates.TemplateResponse(
         "triage.html",
-        {
-            "request": request,
-            "user": user,
-            "scopes": user.get("scopes", []),
-            "report": report,
-            "slides_json": slides_data,
-        },
+        {**_user_ctx(request, user), "report": report, "slides_json": slides_data},
     )
 
 
@@ -169,11 +125,8 @@ async def review_page(
     report_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
-    user = _get_user_or_redirect(request)
-    if not user:
-        return RedirectResponse(url="/auth/login")
-
     result = await db.execute(select(FAReport).where(FAReport.id == report_id))
     report = result.scalar_one_or_none()
     if not report:
@@ -181,12 +134,7 @@ async def review_page(
 
     return templates.TemplateResponse(
         "review.html",
-        {
-            "request": request,
-            "user": user,
-            "scopes": user.get("scopes", []),
-            "report": report,
-        },
+        {**_user_ctx(request, user), "report": report},
     )
 
 
@@ -195,11 +143,8 @@ async def report_slides_page(
     report_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
-    user = _get_user_or_redirect(request)
-    if not user:
-        return RedirectResponse(url="/auth/login")
-
     result = await db.execute(select(FAReport).where(FAReport.id == report_id))
     report = result.scalar_one_or_none()
     if not report:
@@ -214,30 +159,16 @@ async def report_slides_page(
 
     return templates.TemplateResponse(
         "report_slides.html",
-        {
-            "request": request,
-            "user": user,
-            "scopes": user.get("scopes", []),
-            "report": report,
-            "slides": slides,
-        },
+        {**_user_ctx(request, user), "report": report, "slides": slides},
     )
 
 
 @router.get("/cases", response_class=HTMLResponse)
-async def cases_page(request: Request):
-    user = _get_user_or_redirect(request)
-    if not user:
-        return RedirectResponse(url="/auth/login")
-
-    return templates.TemplateResponse(
-        "case_list.html",
-        {
-            "request": request,
-            "user": user,
-            "scopes": user.get("scopes", []),
-        },
-    )
+async def cases_page(
+    request: Request,
+    user: FAUser = Security(get_web_user, scopes=["read"]),
+):
+    return templates.TemplateResponse("case_list.html", _user_ctx(request, user))
 
 
 @router.get("/cases/{case_id}", response_class=HTMLResponse)
@@ -245,11 +176,8 @@ async def case_detail_page(
     case_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
-    user = _get_user_or_redirect(request)
-    if not user:
-        return RedirectResponse(url="/auth/login")
-
     result = await db.execute(select(FACase).where(FACase.id == case_id))
     case = result.scalar_one_or_none()
     if not case:
@@ -257,12 +185,7 @@ async def case_detail_page(
 
     return templates.TemplateResponse(
         "case_detail.html",
-        {
-            "request": request,
-            "user": user,
-            "scopes": user.get("scopes", []),
-            "case": case,
-        },
+        {**_user_ctx(request, user), "case": case},
     )
 
 
@@ -271,11 +194,8 @@ async def week_detail_page(
     period_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
-    user = _get_user_or_redirect(request)
-    if not user:
-        return RedirectResponse(url="/auth/login")
-
     result = await db.execute(
         select(FAWeeklyPeriod).where(FAWeeklyPeriod.id == period_id)
     )
@@ -283,7 +203,6 @@ async def week_detail_page(
     if not period:
         return RedirectResponse(url="/")
 
-    # Get reports for this week
     reports_result = await db.execute(
         select(FAReport, FAUser.employee_name)
         .join(FAUser, FAReport.uploader_id == FAUser.id)
@@ -296,11 +215,5 @@ async def week_detail_page(
 
     return templates.TemplateResponse(
         "week_detail.html",
-        {
-            "request": request,
-            "user": user,
-            "scopes": user.get("scopes", []),
-            "period": period,
-            "reports": reports,
-        },
+        {**_user_ctx(request, user), "period": period, "reports": reports},
     )

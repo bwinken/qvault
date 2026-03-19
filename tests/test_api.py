@@ -4,22 +4,60 @@ These tests verify routing, request validation, and response shapes
 without requiring a real database.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from fastapi.security import SecurityScopes
 from fastapi.testclient import TestClient
 
+from app.core.auth import check_scopes, get_web_user
 from app.main import app
+from app.models.database import get_db
+from app.models.fa_case import FAUser
 
-_MOCK_PAYLOAD = {"sub": "test", "org_id": "test", "scopes": ["read", "write", "admin"]}
+
+def _make_mock_user(scopes: list[str] | None = None) -> FAUser:
+    """Create a mock FAUser with jwt_scopes attached."""
+    user = MagicMock(spec=FAUser)
+    user.id = 1
+    user.employee_name = "test"
+    user.org_id = "test"
+    user.jwt_scopes = scopes or ["read", "write", "admin"]
+    return user
+
+
+def _override_auth(scopes: list[str] | None = None):
+    """Return a dependency override for get_web_user with scope enforcement."""
+    user_scopes = scopes or ["read", "write", "admin"]
+    mock_user = _make_mock_user(user_scopes)
+
+    async def override(security_scopes: SecurityScopes = SecurityScopes()):
+        check_scopes(security_scopes.scopes, user_scopes)
+        return mock_user
+
+    return override
+
+
+def _override_db():
+    """Return a dependency override that yields a mock async session."""
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+    mock_session.execute = AsyncMock(return_value=mock_result)
+
+    async def override():
+        yield mock_session
+
+    return override
 
 
 @pytest.fixture
 def client():
     """TestClient with auth bypassed (full scopes)."""
-    with patch("app.routers.cases.require_scope", return_value=_MOCK_PAYLOAD):
-        with TestClient(app) as c:
-            yield c
+    app.dependency_overrides[get_web_user] = _override_auth()
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.pop(get_web_user, None)
 
 
 class TestHealthEndpoint:
@@ -36,22 +74,20 @@ class TestCasesEndpointValidation:
     """Test that query parameter validation works on /api/cases."""
 
     def test_page_must_be_positive(self, client):
-        with patch("app.routers.cases.get_db") as mock_get_db:
-            mock_session = AsyncMock()
-            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_session.__aexit__ = AsyncMock(return_value=False)
-            mock_get_db.return_value = mock_session
-
+        app.dependency_overrides[get_db] = _override_db()
+        try:
             resp = client.get("/api/cases?page=0")
             assert resp.status_code == 422  # validation error
+        finally:
+            app.dependency_overrides.pop(get_db, None)
 
     def test_page_size_max_100(self, client):
-        with patch("app.routers.cases.get_db") as mock_get_db:
-            mock_session = AsyncMock()
-            mock_get_db.return_value = mock_session
-
+        app.dependency_overrides[get_db] = _override_db()
+        try:
             resp = client.get("/api/cases?page_size=200")
             assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.pop(get_db, None)
 
 
 class TestDeleteCaseEndpoint:
@@ -59,23 +95,12 @@ class TestDeleteCaseEndpoint:
 
     def test_delete_nonexistent_case(self, client):
         """Deleting a non-existent case should 404."""
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-
-        mock_session = AsyncMock()
-        mock_session.execute = AsyncMock(return_value=mock_result)
-
-        from app.models.database import get_db
-
-        async def override_db():
-            yield mock_session
-
-        app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_db] = _override_db()
         try:
             resp = client.delete("/api/cases/99999")
             assert resp.status_code == 404
         finally:
-            app.dependency_overrides = {}
+            app.dependency_overrides.pop(get_db, None)
 
 
 class TestScopeEnforcement:
@@ -83,36 +108,26 @@ class TestScopeEnforcement:
 
     def test_write_endpoint_rejects_read_only_user(self):
         """A user with only 'read' scope should get 403 on write endpoints."""
-        read_only = {"sub": "viewer", "org_id": "test", "scopes": ["read"]}
-
-        with patch("app.core.auth.get_current_user_payload", return_value=read_only):
+        app.dependency_overrides[get_web_user] = _override_auth(["read"])
+        app.dependency_overrides[get_db] = _override_db()
+        try:
             with TestClient(app) as c:
                 resp = c.delete("/api/cases/1")
                 assert resp.status_code == 403
                 assert "write" in resp.json()["detail"]
+        finally:
+            app.dependency_overrides.pop(get_web_user, None)
+            app.dependency_overrides.pop(get_db, None)
 
     def test_read_endpoint_allows_read_only_user(self):
         """A user with 'read' scope should be able to access read endpoints."""
-        read_only = {"sub": "viewer", "org_id": "test", "scopes": ["read"]}
-
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_session = AsyncMock()
-        mock_session.execute = AsyncMock(return_value=mock_result)
-
-        from app.models.database import get_db
-
-        async def override_db():
-            yield mock_session
-
-        app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_web_user] = _override_auth(["read"])
+        app.dependency_overrides[get_db] = _override_db()
         try:
-            with patch(
-                "app.core.auth.get_current_user_payload", return_value=read_only
-            ):
-                with TestClient(app) as c:
-                    resp = c.get("/api/cases/1")
-                    # Should get 404 (case not found), NOT 401/403
-                    assert resp.status_code == 404
+            with TestClient(app) as c:
+                resp = c.get("/api/cases/1")
+                # Should get 404 (case not found), NOT 401/403
+                assert resp.status_code == 404
         finally:
-            app.dependency_overrides = {}
+            app.dependency_overrides.pop(get_web_user, None)
+            app.dependency_overrides.pop(get_db, None)

@@ -4,16 +4,16 @@ import asyncio
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import require_scope
+from app.core.auth import get_web_user
 from app.core.tasks import track_task
 from app.core.config import settings
 from app.models.database import get_db
-from app.models.fa_case import FAReport, FAReportSlide
+from app.models.fa_case import FAReport, FAReportSlide, FAUser
 from app.routers.upload import (
     _PROGRESS_TTL_SECONDS,
     _evict_progress_after,
@@ -32,11 +32,10 @@ router = APIRouter(prefix="/api", tags=["triage"])
 @router.get("/reports/{report_id}/triage")
 async def get_triage_data(
     report_id: int,
-    request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
     """Get classification results for triage UI."""
-    require_scope(request, "read")
 
     result = await db.execute(select(FAReport).where(FAReport.id == report_id))
     report = result.scalar_one_or_none()
@@ -76,9 +75,9 @@ async def confirm_triage(
     body: TriageConfirmRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["write"]),
 ):
     """Confirm user's classification overrides before triggering extraction."""
-    require_scope(request, "write")
 
     result = await db.execute(select(FAReport).where(FAReport.id == report_id))
     report = result.scalar_one_or_none()
@@ -117,9 +116,9 @@ async def trigger_extraction(
     report_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["write"]),
 ):
     """Trigger Stage 2 field extraction for confirmed case slides."""
-    require_scope(request, "write")
 
     result = await db.execute(select(FAReport).where(FAReport.id == report_id))
     report = result.scalar_one_or_none()
@@ -318,9 +317,9 @@ async def reclassify_slide(
     slide_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["write"]),
 ):
     """Retry VLM classification for a single slide."""
-    require_scope(request, "write")
 
     result = await db.execute(select(FAReportSlide).where(FAReportSlide.id == slide_id))
     slide = result.scalar_one_or_none()

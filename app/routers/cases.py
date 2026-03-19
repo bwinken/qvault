@@ -3,12 +3,12 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Security
 from loguru import logger
 from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import get_or_create_user, require_scope
+from app.core.auth import get_web_user
 from app.core.tasks import track_task
 from app.core.config import settings
 from app.models.database import get_db
@@ -38,11 +38,9 @@ async def confirm_and_save(
     cases_data: list[ConfirmCaseData],
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["write"]),
 ):
     """Save reviewed cases to DB (先審後存). Called after user reviews extraction results."""
-    payload = require_scope(request, "write")
-    user = await get_or_create_user(db, payload)
-
     result = await db.execute(select(FAReport).where(FAReport.id == report_id))
     report = result.scalar_one_or_none()
     if not report:
@@ -149,7 +147,6 @@ async def _generate_embeddings_background(
 
 @router.get("/cases")
 async def list_cases(
-    request: Request,
     db: AsyncSession = Depends(get_db),
     q: str | None = Query(None, description="Full-text search query"),
     customer: str | None = Query(None),
@@ -158,10 +155,9 @@ async def list_cases(
     week: int | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
     """List/search FA cases with filtering and full-text search."""
-    require_scope(request, "read")
-
     query = select(FACase).join(FAReport).join(FAWeeklyPeriod)
 
     # Filters
@@ -230,12 +226,10 @@ async def list_cases(
 @router.get("/cases/{case_id}")
 async def get_case(
     case_id: int,
-    request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
     """Get a single case detail."""
-    require_scope(request, "read")
-
     result = await db.execute(select(FACase).where(FACase.id == case_id))
     case = result.scalar_one_or_none()
     if not case:
@@ -265,12 +259,10 @@ async def get_case(
 @router.get("/cases/{case_id}/history")
 async def get_case_history(
     case_id: int,
-    request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
     """Get field-level edit history for a case."""
-    require_scope(request, "read")
-
     result = await db.execute(
         select(FACaseFieldLog, FAUser.employee_name)
         .join(FAUser, FACaseFieldLog.edited_by_id == FAUser.id)
@@ -299,11 +291,9 @@ async def update_case(
     data: CaseEditRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["write"]),
 ):
     """Update a case's fields."""
-    payload = require_scope(request, "write")
-    user = await get_or_create_user(db, payload)
-
     result = await db.execute(select(FACase).where(FACase.id == case_id))
     case = result.scalar_one_or_none()
     if not case:
@@ -367,13 +357,10 @@ async def update_case(
 @router.delete("/cases/{case_id}")
 async def delete_case(
     case_id: int,
-    request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["write"]),
 ):
     """Delete a case."""
-    payload = require_scope(request, "write")
-    user = await get_or_create_user(db, payload)
-
     result = await db.execute(select(FACase).where(FACase.id == case_id))
     case = result.scalar_one_or_none()
     if not case:
@@ -414,12 +401,10 @@ async def delete_case(
 @router.get("/reports/{report_id}/slides")
 async def list_report_slides(
     report_id: int,
-    request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
     """List all slides for a report with their case linkage status."""
-    require_scope(request, "read")
-
     result = await db.execute(
         select(FAReportSlide)
         .where(FAReportSlide.report_id == report_id)
@@ -448,11 +433,9 @@ async def create_case_from_slide(
     data: CaseEditRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["write"]),
 ):
     """Manually create an FA case from any slide (post-confirmation recovery)."""
-    payload = require_scope(request, "write")
-    user = await get_or_create_user(db, payload)
-
     result = await db.execute(select(FAReportSlide).where(FAReportSlide.id == slide_id))
     slide = result.scalar_one_or_none()
     if not slide:
@@ -520,14 +503,13 @@ async def search_similar_cases(
     q: str | None = Query(None, description="Text query for semantic search"),
     case_id: int | None = Query(None, description="Find cases similar to this case"),
     limit: int = Query(10, ge=1, le=50),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
     """Find similar cases using pgvector cosine similarity.
 
     Provide either `q` (text query → generate embedding → search)
     or `case_id` (use existing case's text_embedding as query vector).
     """
-    require_scope(request, "read")
-
     if not q and not case_id:
         raise HTTPException(status_code=400, detail="Provide either 'q' or 'case_id'")
 
@@ -592,10 +574,9 @@ async def regenerate_missing_embeddings(
     request: Request,
     db: AsyncSession = Depends(get_db),
     limit: int = Query(50, ge=1, le=200, description="Max cases to process"),
+    user: FAUser = Security(get_web_user, scopes=["admin"]),
 ):
     """Find confirmed cases with missing text embeddings and regenerate them."""
-    require_scope(request, "admin")
-
     result = await db.execute(
         select(FACase.id)
         .where(FACase.confirmed_by_id.isnot(None))
@@ -617,9 +598,9 @@ async def regenerate_missing_embeddings(
 
 @router.post("/admin/archive-vlm-responses")
 async def archive_old_vlm_responses(
-    request: Request,
     db: AsyncSession = Depends(get_db),
     days: int = Query(90, ge=7, description="Archive responses older than N days"),
+    user: FAUser = Security(get_web_user, scopes=["admin"]),
 ):
     """Null out raw_vlm_response for old confirmed cases to reclaim DB space.
 
@@ -627,7 +608,6 @@ async def archive_old_vlm_responses(
     debugging shortly after extraction.  After *days* have passed the
     structured fields in the case record are the source of truth.
     """
-    require_scope(request, "admin")
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     result = await db.execute(
         update(FACase)
@@ -641,13 +621,11 @@ async def archive_old_vlm_responses(
 
 @router.get("/weeks")
 async def list_weeks(
-    request: Request,
     db: AsyncSession = Depends(get_db),
     year: int | None = Query(None),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
     """List weekly periods with report/case counts."""
-    require_scope(request, "read")
-
     query = (
         select(
             FAWeeklyPeriod,

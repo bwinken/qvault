@@ -4,7 +4,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Security
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from httpx import Timeout
@@ -13,10 +13,11 @@ from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from app.core.auth import get_current_user_payload
+from app.core.auth import get_web_user
 from app.core.config import settings
 from app.core.logging_config import setup_logging
-from app.routers import auth, cases, pages, triage, upload
+from app.models.fa_case import FAUser
+from app.routers import cases, pages, triage, upload
 from app.services.vlm_extractor import reset_semaphore
 
 setup_logging()
@@ -163,8 +164,10 @@ uploads_dir = settings.upload_path
 
 
 @app.get("/uploads/{file_path:path}")
-async def serve_upload(file_path: str, request: Request):
-    get_current_user_payload(request)
+async def serve_upload(
+    file_path: str,
+    user: FAUser = Security(get_web_user, scopes=["read"]),
+):
     full_path = (uploads_dir / file_path).resolve()
     if not full_path.is_relative_to(uploads_dir.resolve()):
         raise HTTPException(status_code=404, detail="Not found")
@@ -174,7 +177,6 @@ async def serve_upload(file_path: str, request: Request):
 
 
 # Routers
-app.include_router(auth.router)
 app.include_router(upload.router)
 app.include_router(triage.router)
 app.include_router(cases.router)

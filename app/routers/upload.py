@@ -5,17 +5,17 @@ import json
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, Security, UploadFile
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
-from app.core.auth import get_or_create_user, require_scope
+from app.core.auth import get_web_user
 from app.core.tasks import track_task
 from app.core.config import settings
 from app.models.database import get_db
-from app.models.fa_case import FAReport, FAReportSlide, FAWeeklyPeriod
+from app.models.fa_case import FAReport, FAReportSlide, FAUser, FAWeeklyPeriod
 from app.services.pptx_parser import (
     convert_pptx_to_images,
     extract_slide_texts,
@@ -50,10 +50,9 @@ async def upload_report(
     request: Request,
     db: AsyncSession = Depends(get_db),
     overwrite: bool = False,
+    user: FAUser = Security(get_web_user, scopes=["write"]),
 ):
     """Upload a PPTX weekly report and start processing."""
-    payload = require_scope(request, "write")
-    user = await get_or_create_user(db, payload)
 
     if not file.filename or not file.filename.endswith(".pptx"):
         raise HTTPException(status_code=400, detail="Only .pptx files are supported")
@@ -169,9 +168,12 @@ async def upload_report(
 
 
 @router.get("/upload/{report_id}/progress")
-async def progress_stream(report_id: int, request: Request):
+async def progress_stream(
+    report_id: int,
+    request: Request,
+    user: FAUser = Security(get_web_user, scopes=["read"]),
+):
     """SSE endpoint for processing progress."""
-    require_scope(request, "read")
 
     queue = _progress_store.get(report_id)
     if queue is None:
@@ -198,9 +200,9 @@ async def get_processing_results(
     report_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    user: FAUser = Security(get_web_user, scopes=["read"]),
 ):
     """Get the extraction results for review (before saving to DB)."""
-    require_scope(request, "read")
 
     result = await db.execute(select(FAReport).where(FAReport.id == report_id))
     report = result.scalar_one_or_none()
