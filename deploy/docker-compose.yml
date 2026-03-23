@@ -1,5 +1,5 @@
 services:
-  postgres:
+  qvault-postgres:
     image: pgvector/pgvector:pg16
     container_name: qvault-pg
     restart: unless-stopped
