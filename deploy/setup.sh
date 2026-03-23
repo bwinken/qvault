@@ -1,5 +1,5 @@
 #!/bin/bash
-# QVault 部署腳本（PostgreSQL + oauth2-proxy + User-Level systemd + Nginx）
+# QVault 部署腳本（PostgreSQL + User-Level systemd + Nginx）
 # 用法: bash deploy/setup.sh
 # 部署到 ~/opt/qvault，以當前使用者身份執行
 set -e
@@ -122,8 +122,7 @@ else
     read -rsp "  OAuth2 Client Secret: " OAUTH2_CLIENT_SECRET
     echo ""
     read -rp "  外部域名 (如 qvault.company.com): " DOMAIN
-    OAUTH2_REDIRECT_URL="http://${DOMAIN}/oauth2/callback"
-    OAUTH2_COOKIE_SECRET=$(openssl rand -base64 32)
+    OAUTH2_REDIRECT_URL="http://${DOMAIN}/auth/callback"
 
     # ── App .env（FastAPI + systemd 使用）──
     cat > "$ENV_FILE" <<ENVEOF
@@ -148,7 +147,12 @@ VLM_MODEL=${VLM_MODEL}
 VLM_EMBEDDING_MODEL=${VLM_EMBEDDING_MODEL}
 VLM_MAX_CONCURRENCY=5
 
-# ── Auth ──
+# ── OIDC Auth ──
+OIDC_ISSUER_URL=${OIDC_ISSUER_URL}
+OAUTH2_CLIENT_ID=${OAUTH2_CLIENT_ID}
+OAUTH2_CLIENT_SECRET=${OAUTH2_CLIENT_SECRET}
+OAUTH2_REDIRECT_URL=${OAUTH2_REDIRECT_URL}
+
 DEV_SKIP_AUTH=false
 ENVEOF
     chmod 600 "$ENV_FILE"
@@ -157,7 +161,7 @@ ENVEOF
     # ── Docker .env（docker-compose 使用）──
     cat > "$DOCKER_ENV_FILE" <<ENVEOF
 # ══════════════════════════════════════════════
-# QVault — Docker 設定檔（PostgreSQL + oauth2-proxy）
+# QVault — Docker 設定檔（PostgreSQL）
 # ══════════════════════════════════════════════
 # App 設定請見 ../.env
 
@@ -169,15 +173,6 @@ PG_USER=${PG_USER}
 PG_PASSWORD=${PG_PASSWORD}
 PG_DB=${PG_DB}
 PG_PORT=${PG_PORT}
-
-# ── OIDC Provider (Auth Center) ──
-OIDC_ISSUER_URL=${OIDC_ISSUER_URL}
-OAUTH2_CLIENT_ID=${OAUTH2_CLIENT_ID}
-OAUTH2_CLIENT_SECRET=${OAUTH2_CLIENT_SECRET}
-OAUTH2_REDIRECT_URL=${OAUTH2_REDIRECT_URL}
-OAUTH2_COOKIE_NAME=_qvault_oauth2
-OAUTH2_COOKIE_SECRET=${OAUTH2_COOKIE_SECRET}
-OAUTH2_COOKIE_SECURE=false
 ENVEOF
     chmod 600 "$DOCKER_ENV_FILE"
     echo "Docker .env 已建立 ✓"
@@ -247,7 +242,7 @@ read -rp ""
 # ║  5. 啟動 Docker 服務                   ║
 # ╚═══════════════════════════════════════╝
 echo ""
-echo "=== 5. 啟動 Docker 服務（PostgreSQL + oauth2-proxy）==="
+echo "=== 5. 啟動 Docker 服務（PostgreSQL）==="
 cd "$DEPLOY_DIR"
 docker compose up -d
 echo "Docker 服務已啟動 ✓"
@@ -299,9 +294,7 @@ echo "=== 9. 安裝 Nginx 設定 ==="
 if command -v nginx &>/dev/null; then
     # 替換模板變數
     DOMAIN="${DOMAIN:-your-server-name}"
-    OAUTH2_PORT="${OAUTH2_PROXY_PORT:-4180}"
     sed -e "s|your-server-name|$DOMAIN|g" \
-        -e "s|__OAUTH2_PROXY_PORT__|$OAUTH2_PORT|g" \
         "$DEPLOY_DIR/nginx.conf" \
         | sudo tee /etc/nginx/sites-available/$APP_NAME > /dev/null
     sudo ln -sf /etc/nginx/sites-available/$APP_NAME /etc/nginx/sites-enabled/$APP_NAME
@@ -327,7 +320,7 @@ echo "    logs/     — 應用日誌"
 echo "    keys/     — Auth Center 公鑰"
 echo "    pgdata/   — PostgreSQL 資料"
 echo ""
-echo "  Docker：PostgreSQL (:${PG_PORT}) + oauth2-proxy (:${OAUTH2_PROXY_PORT:-4180})"
+echo "  Docker：PostgreSQL (:${PG_PORT})"
 echo "  App：http://127.0.0.1:8000"
 echo ""
 echo "服務管理："

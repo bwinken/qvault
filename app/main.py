@@ -13,10 +13,11 @@ from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from app.core.auth import get_web_user
+from app.core.auth import _get_oidc_config, get_web_user
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.models.fa_case import FAUser
+from app.routers import auth as auth_router
 from app.routers import cases, pages, triage, upload
 from app.services.vlm_extractor import reset_semaphore
 
@@ -84,6 +85,15 @@ async def lifespan(app: FastAPI):
 
     # Clean up stale files from abandoned reviews
     _cleanup_stale_files()
+
+    # Pre-load OIDC discovery (skip in dev/mock mode)
+    if not settings.dev_skip_auth and settings.oidc_issuer_url:
+        try:
+            await _get_oidc_config()
+        except Exception:
+            logger.warning(
+                "Failed to load OIDC config on startup; will retry on first login"
+            )
 
     yield
 
@@ -193,6 +203,9 @@ else:
             raise HTTPException(status_code=404, detail="Not found")
         return FileResponse(full_path)
 
+
+# Auth routes (always available)
+app.include_router(auth_router.router)
 
 # Routers
 if settings.mock_data:

@@ -80,7 +80,7 @@ Use `track_task(task, app.state.background_tasks, "name")` from `app/core/tasks.
 
 ### Auth
 
-Authentication is handled by **oauth2-proxy** (Docker container) + **Nginx** `auth_request`. The app never touches the OAuth flow directly — it only receives a verified JWT via the `Authorization: Bearer` header that Nginx injects from oauth2-proxy's `X-Auth-Request-Access-Token` response header. The app verifies the JWT with Auth Center's RS256 public key (`keys/public.pem`). Set `DEV_SKIP_AUTH=true` to bypass for local dev (returns a hardcoded dev user). Auth check is done per-route via `get_current_user_payload(request)`.
+The app handles the full OIDC flow directly (no external oauth2-proxy). Login redirects to the OIDC provider, the callback endpoint exchanges the authorization code for an access token (JWT), which is stored in a signed session cookie (`itsdangerous`). On each request, `get_web_user` reads the cookie, verifies the JWT with Auth Center's RS256 public key (`keys/public.pem`), and enforces scope-based RBAC. Unauthenticated requests redirect to `/auth/login`. Set `DEV_SKIP_AUTH=true` to bypass for local dev (returns a hardcoded dev user).
 
 ### Logging
 
@@ -97,8 +97,8 @@ PostgreSQL-only — uses `pgvector` (Vector columns), `ARRAY(Text)`, and GIN ind
 ## Environment
 
 Two separate `.env` files:
-- **`.env`** (project root) — App config (FastAPI + systemd). Loaded by `pydantic-settings` in `app/core/config.py`. Contains DB connection, VLM, auth, and path settings.
-- **`deploy/.env`** — Docker services config (PostgreSQL + oauth2-proxy). Loaded by `docker-compose.yml`. Contains PG primitives, OIDC/OAuth2 settings.
+- **`.env`** (project root) — App config (FastAPI + systemd). Loaded by `pydantic-settings` in `app/core/config.py`. Contains DB connection, VLM, OIDC auth, and path settings.
+- **`deploy/.env`** — Docker services config (PostgreSQL). Loaded by `docker-compose.yml`. Contains PG primitives and DATA_DIR.
 
 Shared vars (`DATA_DIR`, `PG_USER`, `PG_PASSWORD`, `PG_PORT`, `PG_DB`) must be kept in sync between both files. Set `DATA_DIR` once — `UPLOAD_DIR`, `LOG_DIR`, `AUTH_PUBLIC_KEY_PATH` are auto-derived. Set `PG_*` vars — `DATABASE_URL` is auto-derived. Individual vars can still be overridden explicitly.
 

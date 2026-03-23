@@ -6,14 +6,14 @@
 ## 架構
 
 ```
-Browser → Nginx (:80)
-    ├── /oauth2/*    → oauth2-proxy (:4180)  [登入/登出]
-    ├── /auth/login  → App (:8000)           [登入頁面，無需驗證]
-    └── /*           → auth_request 驗證
-                     → App (:8000)           [JWT 注入 Authorization header]
+Browser → Nginx (:80) → App (:8000)
+    ├── /auth/login     → 導向 OIDC Provider
+    ├── /auth/callback  → 交換 code → 設定 session cookie
+    ├── /auth/logout    → 清除 session cookie
+    └── /*              → 驗證 session cookie 中的 JWT
 ```
 
-App 以 Python venv 跑在主機上（systemd 管理），PG + oauth2-proxy 用 Docker Compose。
+App 以 Python venv 跑在主機上（systemd 管理），PG 用 Docker Compose。App 內建 OIDC 驗證，不需要 oauth2-proxy。
 
 ### 設定檔結構
 
@@ -22,7 +22,7 @@ App 以 Python venv 跑在主機上（systemd 管理），PG + oauth2-proxy 用 
 | 檔案 | 用途 | 使用者 |
 |------|------|--------|
 | `~/opt/qvault/.env` | App 設定（DB 連線、VLM、Auth） | FastAPI + systemd |
-| `~/opt/qvault/deploy/.env` | Docker 服務設定（PG 初始化、OIDC） | docker-compose |
+| `~/opt/qvault/deploy/.env` | Docker 服務設定（PG 初始化） | docker-compose |
 
 共用變數（`DATA_DIR`、`PG_*`）需在兩個檔案中保持一致。`setup.sh` 會自動產生兩份。
 
@@ -102,12 +102,13 @@ cd ~/opt/qvault
 
 # App 設定（FastAPI + systemd）
 cp .env.example .env
-# 編輯 .env — 填入：DATA_DIR, PG_PASSWORD, VLM_BASE_URL, VLM_MODEL
+# 編輯 .env — 填入：DATA_DIR, PG_PASSWORD, VLM_BASE_URL, VLM_MODEL,
+#   OIDC_ISSUER_URL, OAUTH2_CLIENT_SECRET, OAUTH2_REDIRECT_URL
 chmod 600 .env
 
 # Docker 服務設定（PostgreSQL + oauth2-proxy）
 cp deploy/.env.example deploy/.env
-# 編輯 deploy/.env — 填入：PG_PASSWORD, OIDC_ISSUER_URL, OAUTH2_CLIENT_SECRET, OAUTH2_REDIRECT_URL
+# 編輯 deploy/.env — 填入：PG_PASSWORD
 # 注意：PG_* 和 DATA_DIR 須與 .env 一致
 chmod 600 deploy/.env
 ```
@@ -120,7 +121,7 @@ mkdir -p /mnt/db/qvault/{uploads/images,logs,keys,pgdata}
 cp /path/to/public.pem /mnt/db/qvault/keys/public.pem
 ```
 
-### Docker 服務（PG + oauth2-proxy）
+### Docker 服務（PostgreSQL）
 
 ```bash
 cd deploy/
@@ -183,8 +184,8 @@ systemctl --user restart qvault
 ├── .venv/                        # uv 管理的虛擬環境
 ├── .env                          # App 設定檔（FastAPI + systemd）
 ├── deploy/
-│   ├── .env                      # Docker 設定檔（PG + oauth2-proxy）
-│   ├── docker-compose.yml        # PG + oauth2-proxy（讀取 deploy/.env）
+│   ├── .env                      # Docker 設定檔（PostgreSQL）
+│   ├── docker-compose.yml        # PostgreSQL（讀取 deploy/.env）
 │   ├── qvault.service            # systemd unit（讀取 ../.env）
 │   └── nginx.conf                # Nginx 模板
 └── alembic/                      # 資料庫遷移
@@ -213,5 +214,5 @@ curl http://localhost:8000/health   # 應回傳 {"status": "ok"}
 | 查看 app 狀態 | `systemctl --user status qvault` |
 | 重啟 app | `systemctl --user restart qvault` |
 | App 日誌 | `journalctl --user -u qvault -f` |
-| PG/Proxy 日誌 | `docker compose -f ~/opt/qvault/deploy/docker-compose.yml logs -f` |
+| PG 日誌 | `docker compose -f ~/opt/qvault/deploy/docker-compose.yml logs -f` |
 | 停止全部 | `systemctl --user stop qvault && docker compose -f ~/opt/qvault/deploy/docker-compose.yml down` |

@@ -50,8 +50,13 @@ class Settings(BaseSettings):
     # Logging
     log_dir: str = ""
 
-    # Auth (JWT verification — oauth2-proxy handles the OAuth flow)
+    # Auth — OIDC (app handles the full OAuth 2.0 flow)
     auth_public_key_path: str = ""
+    oidc_issuer_url: str = ""
+    oauth2_client_id: str = ""
+    oauth2_client_secret: str = ""
+    oauth2_redirect_url: str = ""  # e.g. http://qvault.example.com/auth/callback
+    session_secret: str = ""  # signs session cookies; auto-derived if not set
     dev_skip_auth: bool = False
 
     # Mock data mode — serves placeholder data without DB/VLM
@@ -72,6 +77,14 @@ class Settings(BaseSettings):
             self.auth_public_key_path = (
                 f"{root}/keys/public.pem" if root else "./keys/public.pem"
             )
+
+        # Derive SESSION_SECRET from OAUTH2_CLIENT_SECRET if not explicitly set
+        if not self.session_secret and self.oauth2_client_secret:
+            import hashlib
+
+            self.session_secret = hashlib.sha256(
+                self.oauth2_client_secret.encode()
+            ).hexdigest()
 
         # Derive DATABASE_URL from PG_* primitives when not explicitly set
         if not self.database_url:
